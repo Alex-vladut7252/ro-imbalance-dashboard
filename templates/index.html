@@ -1,0 +1,2767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+        // Disable browser-managed scroll restoration so reloads reset to top.
+        // Must run before any rendering — browsers read this before layout.
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+        // Also force an explicit top-jump on early page lifecycle, in case
+        // the browser already started restoring from bfcache.
+        window.addEventListener('pageshow', () => window.scrollTo(0, 0), { once: true });
+    </script>
+    <title>Energy Prediction — Romania</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='22'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Disable Chart.js animations globally. Live polling rebuilds charts
+        // every 15-60 seconds; animated redraws were the main source of
+        // scroll jank. Tooltips / hover effects remain instant.
+        if (window.Chart) { Chart.defaults.animation = false; }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script>const SCRIPT_ROOT = "";</script>
+    <style>
+        /* ───────────── Design tokens ───────────── */
+        :root {
+            --bg: #f7f8fa;
+            --bg-subtle: #f0f2f5;
+            --card-bg: #ffffff;
+            --surface-hover: #f4f4f5;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --text-subtle: #94a3b8;
+            --border: #e4e7ec;
+            --border-strong: #cdd5df;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-soft: #dbeafe;
+            --success: #16a34a;
+            --success-soft: #dcfce7;
+            --danger: #dc2626;
+            --danger-soft: #fee2e2;
+            --warning: #d97706;
+            --warning-soft: #fef3c7;
+            --accent: #06b6d4;
+            --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+            --shadow: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+            --shadow-lg: 0 10px 20px -5px rgb(15 23 42 / 0.08), 0 4px 8px -4px rgb(15 23 42 / 0.04);
+            --shadow: var(--shadow-sm);
+            --radius-sm: 6px;
+            --radius: 10px;
+            --radius-lg: 14px;
+
+            /* Back-compat with existing JS inline styles */
+            --input-bg: #ffffff;
+            --input-text: #0f172a;
+            --table-header-bg: #f8fafc;
+            --table-alt-bg: #f8fafc;
+            --table-border: #e4e7ec;
+            --form-bg: #f8fafc;
+            --ghost-bg: #eff6ff;
+        }
+        body.dark-mode {
+            --bg: #09090b;
+            --bg-subtle: #0f0f12;
+            --card-bg: #141417;
+            --surface-hover: #1f1f23;
+            --text: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --text-subtle: #71717a;
+            --border: #27272a;
+            --border-strong: #3f3f46;
+            --primary: #3b82f6;
+            --primary-hover: #60a5fa;
+            --primary-soft: rgb(37 99 235 / 0.15);
+            --success: #4ade80;
+            --success-soft: rgb(22 163 74 / 0.18);
+            --danger: #f87171;
+            --danger-soft: rgb(220 38 38 / 0.18);
+            --warning: #fbbf24;
+            --warning-soft: rgb(217 119 6 / 0.18);
+            --accent: #22d3ee;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+            --shadow-lg: 0 10px 25px -5px rgb(0 0 0 / 0.5);
+
+            --input-bg: #18181b;
+            --input-text: #f4f4f5;
+            --table-header-bg: #18181b;
+            --table-alt-bg: #1a1a1e;
+            --table-border: #27272a;
+            --form-bg: #18181b;
+            --ghost-bg: #1e293b;
+        }
+
+        /* ───────────── Reset & base ───────────── */
+        *, *::before, *::after { box-sizing: border-box; }
+        /* Smooth scroll makes every Page-Up / arrow-key scroll animate and
+           feels laggy on long pages — keep it instant. */
+        html { scroll-behavior: auto; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'tnum';
+        }
+        h1, h2, h3, h4, h5, h6 { color: var(--text); letter-spacing: -0.01em; }
+        h1 { font-size: 20px; font-weight: 600; margin: 0; }
+        h3 { font-size: 15px; font-weight: 600; margin: 0; }
+        h4 { font-size: 12px; font-weight: 600; margin: 0 0 10px 0; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        p { margin: 0; }
+        label { font-weight: 500; color: var(--text-muted); font-size: 12px; letter-spacing: 0.02em; }
+        canvas { max-width: 100%; }
+        code, .mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; font-feature-settings: 'tnum'; }
+
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+        /* ───────────── Ambient background (aurora + grid) ───────────── */
+        .bg-layer {
+            position: fixed; inset: 0;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+            contain: strict;
+        }
+        .bg-layer::before, .bg-layer::after,
+        .bg-layer .orb {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.55;
+            will-change: transform;
+        }
+        .bg-layer::before {
+            width: 520px; height: 520px;
+            top: -120px; left: -120px;
+            background: radial-gradient(circle at 30% 30%, #60a5fa, transparent 70%);
+            animation: orbDrift1 22s ease-in-out infinite alternate;
+        }
+        .bg-layer::after {
+            width: 620px; height: 620px;
+            bottom: -180px; right: -180px;
+            background: radial-gradient(circle at 70% 70%, #22d3ee, transparent 70%);
+            animation: orbDrift2 28s ease-in-out infinite alternate;
+        }
+        .bg-layer .orb {
+            width: 460px; height: 460px;
+            top: 40%; left: 55%;
+            background: radial-gradient(circle at 50% 50%, #a78bfa, transparent 70%);
+            animation: orbDrift3 26s ease-in-out infinite alternate;
+        }
+        body.dark-mode .bg-layer::before { background: radial-gradient(circle at 30% 30%, #3b82f6, transparent 70%); opacity: 0.35; }
+        body.dark-mode .bg-layer::after { background: radial-gradient(circle at 70% 70%, #06b6d4, transparent 70%); opacity: 0.35; }
+        body.dark-mode .bg-layer .orb { background: radial-gradient(circle at 50% 50%, #8b5cf6, transparent 70%); opacity: 0.3; }
+
+        @keyframes orbDrift1 {
+            0%   { transform: translate3d(0,0,0) scale(1); }
+            100% { transform: translate3d(60px,80px,0) scale(1.15); }
+        }
+        @keyframes orbDrift2 {
+            0%   { transform: translate3d(0,0,0) scale(1); }
+            100% { transform: translate3d(-80px,-40px,0) scale(1.1); }
+        }
+        @keyframes orbDrift3 {
+            0%   { transform: translate3d(0,0,0) scale(1); }
+            100% { transform: translate3d(40px,-100px,0) scale(0.95); }
+        }
+
+        .bg-grid {
+            position: fixed; inset: 0;
+            pointer-events: none;
+            z-index: -1;
+            background-image:
+                radial-gradient(circle, var(--text-subtle) 0.6px, transparent 0.6px);
+            background-size: 22px 22px;
+            background-position: 0 0;
+            opacity: 0.22;
+            mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.9), transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.9), transparent 80%);
+        }
+        body.dark-mode .bg-grid { opacity: 0.14; }
+
+        /* ───────────── Brand shimmer ───────────── */
+        .brand-title {
+            background: linear-gradient(90deg, var(--text) 0%, var(--text) 40%, var(--primary) 50%, var(--text) 60%, var(--text) 100%);
+            background-size: 200% 100%;
+            background-position: 100% 0;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: shimmer 6s linear infinite;
+        }
+        @keyframes shimmer {
+            0%   { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+
+        /* ───────────── Button shine sweep ───────────── */
+        button { position: relative; overflow: hidden; isolation: isolate; }
+        button::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.28) 50%, transparent 70%);
+            transform: translateX(-120%);
+            transition: transform 0.55s ease;
+            pointer-events: none;
+            z-index: 1;
+        }
+        button:hover::before { transform: translateX(120%); }
+        button > * { position: relative; z-index: 2; }
+        .icon-btn::before { display: none; }
+
+        /* ───────────── Card glow on hover ───────────── */
+        .card {
+            position: relative;
+        }
+        .card:hover {
+            box-shadow: var(--shadow-sm), 0 0 0 1px rgb(37 99 235 / 0.08), 0 12px 32px -12px rgb(37 99 235 / 0.18);
+        }
+        body.dark-mode .card:hover {
+            box-shadow: var(--shadow-sm), 0 0 0 1px rgb(59 130 246 / 0.18), 0 14px 36px -12px rgb(59 130 246 / 0.25);
+        }
+
+        /* ───────────── Scroll reveal (JS-gated) ───────────── */
+        body.js-ready .draggable-section { opacity: 0; transition: opacity 0.25s ease; }
+        body.js-ready .draggable-section.revealed { opacity: 1; }
+
+        /* ───────────── Section source hint ─────────────
+           A thin, muted line under each card header that tells users where
+           the data comes from (ENTSO-E / MAVIR / DAMAS / ECB FX). Small
+           pills distinguish live vs archive vs currency sources at a glance. */
+        .source-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            min-height: 18px;
+        }
+        .src-pill {
+            display: inline-flex; align-items: center;
+            padding: 1px 8px; border-radius: 999px;
+            font-size: 10px; letter-spacing: 0.03em; font-weight: 600;
+            border: 1px solid transparent;
+        }
+        .src-pill.live    { background: rgba(39,174,96,0.12);  color: #27ae60; border-color: rgba(39,174,96,0.3); }
+        .src-pill.archive { background: rgba(52,152,219,0.12); color: #3498db; border-color: rgba(52,152,219,0.3); }
+        .src-pill.fx      { background: rgba(155,89,182,0.12); color: #9b59b6; border-color: rgba(155,89,182,0.3); }
+        .src-pill.stale   { background: rgba(243,156,18,0.15); color: #f39c12; border-color: rgba(243,156,18,0.35); }
+        .src-pill.src     { background: var(--table-alt-bg, rgba(128,128,128,0.08)); color: var(--text-muted); border-color: var(--border, rgba(128,128,128,0.2)); }
+
+        /* ───────────── Imbalance table — refined ─────────────
+           Modern, minimal, Linear/Stripe-style data grid. Generous spacing,
+           tabular numerals, muted scale, subtle hover. Negatives are the
+           only color cue (positives stay neutral) so the eye lands on
+           system-stress quarters without retina-stripping zebra rows. */
+        :root {
+            --imb-bg:       var(--card-bg, #fff);
+            --imb-bg-alt:   color-mix(in oklab, var(--imb-bg) 96%, transparent);
+            --imb-border:   color-mix(in oklab, var(--text, #1f2937) 8%, transparent);
+            --imb-border-strong: color-mix(in oklab, var(--text, #1f2937) 14%, transparent);
+            --imb-row-hover: color-mix(in oklab, #3498db 8%, transparent);
+            --imb-row-current-bg: color-mix(in oklab, #3498db 10%, transparent);
+            --imb-num-neg: #d14343;
+            --imb-num-pos: #1f9d55;
+            --imb-num-empty: color-mix(in oklab, var(--text-muted, #6b7280) 70%, transparent);
+        }
+        body.dark-mode {
+            --imb-bg: #181b24;
+            --imb-bg-alt: #1d2129;
+            --imb-border: rgba(255,255,255,0.07);
+            --imb-border-strong: rgba(255,255,255,0.13);
+            --imb-row-hover: rgba(96, 165, 250, 0.10);
+            --imb-row-current-bg: rgba(96, 165, 250, 0.14);
+            --imb-num-neg: #f87171;
+            --imb-num-pos: #4ade80;
+        }
+
+        #imbalanceTableContainer {
+            border: 1px solid var(--imb-border-strong);
+            border-radius: 12px;
+            background: var(--imb-bg);
+            overflow: auto;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.01);
+            max-height: 560px;
+        }
+        body.dark-mode #imbalanceTableContainer {
+            box-shadow: 0 1px 2px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.03);
+        }
+
+        .imb-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: 'tnum' 1, 'cv11' 1;
+            white-space: nowrap;
+            color: var(--text, #1f2937);
+        }
+
+        /* Header — subtle, not loud. Sticky with a hairline shadow on
+           scroll so headers never look "floating" above body content. */
+        .imb-table thead th {
+            position: sticky; top: 0; z-index: 3;
+            background: var(--imb-bg);
+            color: var(--text-muted, #6b7280);
+            font-size: 10.5px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 14px 14px 10px;
+            border-bottom: 1px solid var(--imb-border-strong);
+            user-select: none;
+        }
+        .imb-table thead th:first-child { padding-left: 20px; }
+        .imb-table thead th:last-child { padding-right: 20px; }
+
+        /* Body cells — comfortable density, no per-row borders. The eye
+           tracks across the row via vertical alignment + tabular numerals;
+           we only draw a separator between every 4th row (one per hour). */
+        .imb-table tbody td {
+            padding: 11px 14px;
+            border-bottom: 1px solid transparent;
+            line-height: 1.4;
+        }
+        .imb-table tbody td:first-child { padding-left: 20px; }
+        .imb-table tbody td:last-child { padding-right: 20px; }
+        .imb-table tbody tr:nth-child(4n) td { border-bottom-color: var(--imb-border); }
+        .imb-table tbody tr:last-child td { border-bottom-color: transparent; }
+
+        /* Time column — primary text. Other columns are tabular numbers. */
+        .imb-table .imb-time {
+            font-weight: 500;
+            color: var(--text, #1f2937);
+            letter-spacing: -0.005em;
+        }
+
+        /* Hover */
+        .imb-table tbody tr { transition: background-color 0.12s ease; }
+        .imb-table tbody tr:hover td { background: var(--imb-row-hover); }
+        .imb-table tbody tr:hover td:first-child { background: var(--imb-row-hover); }
+
+        /* Current quarter — full-row tint plus a thin LEFT accent rendered
+           as a box-shadow so it doesn't perturb sticky-header z-index. */
+        .imb-table tbody tr.imb-current td { background: var(--imb-row-current-bg); }
+        .imb-table tbody tr.imb-current td:first-child {
+            font-weight: 600;
+            color: #3498db;
+            box-shadow: inset 3px 0 0 #3498db;
+        }
+        body.dark-mode .imb-table tbody tr.imb-current td:first-child { color: #60a5fa; box-shadow: inset 3px 0 0 #60a5fa; }
+        .imb-table .now-dot {
+            display: inline-block; width: 6px; height: 6px; border-radius: 999px;
+            background: #3498db; margin-right: 8px; vertical-align: middle;
+            animation: imbPulse 2s ease-in-out infinite;
+        }
+        body.dark-mode .imb-table .now-dot { background: #60a5fa; }
+        @keyframes imbPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(52,152,219,0.45); }
+            50%      { box-shadow: 0 0 0 6px rgba(52,152,219,0); }
+        }
+
+        /* Numeric formatting */
+        .imb-table .num            { font-feature-settings: 'tnum' 1; color: var(--text, #1f2937); }
+        .imb-table .num-pos        { color: var(--imb-num-pos); font-weight: 500; }
+        .imb-table .num-neg        { color: var(--imb-num-neg); font-weight: 500; }
+        .imb-table .num-zero       { color: var(--text-muted, #9ca3af); }
+        .imb-table .num-empty      { color: var(--imb-num-empty); }
+        .imb-table .num-unit       { color: var(--text-muted, #9ca3af); font-size: 10.5px; margin-left: 2px; font-weight: 400; }
+
+        /* Reduced motion: no pulse */
+        @media (prefers-reduced-motion: reduce) {
+            .imb-table .now-dot { animation: none; }
+            .imb-table tbody tr { transition: none; }
+        }
+
+        /* ───────────── Responsive breakpoints ─────────────
+           Collapse 2-column merit-order tables and 4-column KPI cards to a
+           single column on narrow screens so labels don't wrap / truncate. */
+        @media (max-width: 720px) {
+            .mo-tables-grid { grid-template-columns: 1fr !important; }
+            #moCards { grid-template-columns: repeat(2, 1fr) !important; }
+            .header-inner { padding: 10px 14px !important; }
+            .card { padding: 14px !important; }
+        }
+        @media (max-width: 420px) {
+            #moCards { grid-template-columns: 1fr !important; }
+        }
+
+        /* ───────────── Reduced motion ───────────── */
+        @media (prefers-reduced-motion: reduce) {
+            .bg-layer::before, .bg-layer::after, .bg-layer .orb,
+            .brand-title, button::before { animation: none !important; transition: none !important; }
+            body.js-ready .draggable-section { opacity: 1 !important; transition: none !important; }
+        }
+
+        /* ───────────── App shell ───────────── */
+        .app-header {
+            position: sticky; top: 0; z-index: 50;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            contain: layout style;
+        }
+        .header-inner {
+            max-width: 1440px; margin: 0 auto;
+            display: flex; align-items: center; gap: 16px;
+            padding: 12px 24px;
+            flex-wrap: wrap;
+        }
+        .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+        .brand-badge {
+            width: 30px; height: 30px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: grid; place-items: center;
+            color: #fff;
+            box-shadow: 0 2px 6px rgb(37 99 235 / 0.3);
+        }
+        .brand-badge svg { width: 16px; height: 16px; }
+        .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+        .brand-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+        .brand-sub { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+        .header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+
+        main.app-main {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 20px 24px 60px;
+        }
+
+        /* ───────────── Form controls ───────────── */
+        input[type="date"], input[type="number"], input[type="text"], select {
+            background: var(--input-bg);
+            color: var(--input-text);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 7px 10px;
+            font-size: 13px;
+            font-family: inherit;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            outline: none;
+        }
+        input[type="date"]:hover, select:hover { border-color: var(--border-strong); }
+        input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgb(37 99 235 / 0.18);
+        }
+        body.dark-mode input:focus, body.dark-mode select:focus { box-shadow: 0 0 0 3px rgb(59 130 246 / 0.25); }
+        select { padding-right: 28px; cursor: pointer; }
+
+        /* ───────────── Buttons ───────────── */
+        button {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            background: var(--primary); color: #fff;
+            border: 1px solid transparent;
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px; font-weight: 500; font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+            margin-left: 0;
+            white-space: nowrap;
+            letter-spacing: -0.005em;
+        }
+        button:hover { background: var(--primary-hover); }
+        button:active { transform: translateY(1px); }
+        button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgb(37 99 235 / 0.25); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ───────────── Icon buttons ───────────── */
+        .icon-btn {
+            width: 34px; height: 34px; padding: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: var(--radius-sm);
+            display: grid; place-items: center;
+        }
+        .icon-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-strong); }
+        .icon-btn svg { width: 17px; height: 17px; display: block; }
+        .theme-toggle .icon-sun { display: none; }
+        body.dark-mode .theme-toggle .icon-sun { display: block; }
+        body.dark-mode .theme-toggle .icon-moon { display: none; }
+
+        /* ───────────── Cards & sections ───────────── */
+        #sectionsContainer { display: flex; flex-direction: column; gap: 18px; }
+        .draggable-section {
+            position: relative;
+            /* `paint` isolates a section's chart/canvas updates from the page
+               layout tree — the main perf win for live-updating cards.
+               `content-visibility: auto` skips painting off-screen cards
+               entirely until they scroll into view. */
+            contain: layout paint style;
+            content-visibility: auto;
+            contain-intrinsic-size: 0 480px;
+        }
+        .draggable-section.sortable-ghost { opacity: 0.35; }
+        .draggable-section.sortable-drag { opacity: 0.95; box-shadow: var(--shadow-lg); }
+
+        .drag-handle {
+            position: absolute; top: 14px; right: 14px;
+            width: 28px; height: 28px;
+            border-radius: var(--radius-sm);
+            color: var(--text-subtle);
+            display: grid; place-items: center;
+            cursor: grab;
+            user-select: none;
+            opacity: 0;
+            transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+            z-index: 10;
+        }
+        .draggable-section:hover .drag-handle { opacity: 1; }
+        .drag-handle:hover { background: var(--surface-hover); color: var(--text); }
+        .drag-handle:active { cursor: grabbing; }
+        .drag-handle svg { width: 16px; height: 16px; }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px 22px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.15s ease;
+            content-visibility: auto;
+            contain-intrinsic-size: 1px 400px;
+        }
+        .card:hover { border-color: var(--border-strong); }
+
+        /* ───────────── Pills & badges ───────────── */
+        .pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 1.55;
+            letter-spacing: 0.01em;
+        }
+        #modeIndicator, #apiStatus, #predModelStatus, #senChartStatus {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px; border-radius: 99px;
+            font-size: 11px; font-weight: 500; line-height: 1.55;
+        }
+
+        /* ───────────── Tables (base) ───────────── */
+        table { font-variant-numeric: tabular-nums; }
+        table th { font-weight: 600; color: var(--text-muted); letter-spacing: 0.02em; }
+        body.dark-mode table { color: var(--text); }
+        body.dark-mode th { background: var(--table-header-bg) !important; color: var(--text-muted) !important; }
+        body.dark-mode td { border-color: var(--table-border) !important; color: var(--text); }
+        body.dark-mode tr:nth-child(even) { background: var(--table-alt-bg) !important; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-subtle); }
+
+        /* Dark-mode fixes for JS-rendered inline-styled elements */
+        body.dark-mode input, body.dark-mode select { background: var(--input-bg) !important; color: var(--input-text) !important; border-color: var(--border) !important; }
+        body.dark-mode .draggable-section > .card { background: var(--card-bg) !important; }
+        body.dark-mode [style*="background:#d5f5e3"], body.dark-mode [style*="background-color:#d5f5e3"] { background: rgba(34,197,94,0.18) !important; color: #86efac !important; }
+        body.dark-mode [style*="background:#fcf3cf"], body.dark-mode [style*="background-color:#fcf3cf"] { background: rgba(234,179,8,0.16) !important; color: #fde047 !important; }
+        body.dark-mode [style*="background:#ffcccc"], body.dark-mode [style*="background-color:#ffcccc"] { background: rgba(239,68,68,0.2) !important; }
+        body.dark-mode [style*="background:#f8f9fa"], body.dark-mode [style*="background-color:#f8f9fa"] { background: var(--table-alt-bg) !important; }
+        body.dark-mode hr { border-color: var(--border) !important; }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            #moCards { grid-template-columns: repeat(2, 1fr) !important; }
+            .mo-tables-grid { grid-template-columns: 1fr !important; }
+            .header-inner { padding: 10px 16px; }
+            main.app-main { padding: 16px; }
+            .brand-sub { display: none; }
+        }
+        @media (max-width: 560px) {
+            #moCards { grid-template-columns: 1fr !important; }
+            .card { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // Apply theme before paint to avoid FOUC flash
+        if (localStorage.getItem('ep_dark_mode') === '1') {
+            document.documentElement.classList.add('pre-dark');
+        }
+    </script>
+    <div class="bg-layer" aria-hidden="true"><div class="orb"></div></div>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('ep_dark_mode', isDark ? '1' : '0');
+            if (typeof senChart !== 'undefined' && senChart) buildSenChart();
+        }
+    </script>
+
+    <header class="app-header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="brand-badge" title="Energy Prediction">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">Energy Prediction</span>
+                    <span class="brand-sub" id="brandSub">Romania · Balancing market</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <label for="countrySel">Country</label>
+                <select id="countrySel" onchange="changeCountry()">
+                    <option value="RO">🇷🇴 Romania</option>
+                    <option value="HU">🇭🇺 Hungary</option>
+                </select>
+                <label for="globalDate" style="margin-left:6px;">Date</label>
+                <input type="date" id="globalDate">
+                <button onclick="loadHistoricalDate()" id="loadDateBtn" class="btn-load">Load</button>
+                <button onclick="goToToday()" id="todayBtn" style="background:var(--success);border-color:var(--success);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                    Today
+                </button>
+                <span id="modeIndicator"></span>
+                <span id="apiStatus"></span>
+            </div>
+            <div class="header-right">
+                <a href="/forecast" title="Wind & solar forecast hub (HU + neighbors)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;color:var(--text);text-decoration:none;font-size:12px;margin-right:8px;">⚡ Forecast Hub</a>
+                <button class="icon-btn theme-toggle" onclick="toggleDarkMode()" title="Toggle theme" aria-label="Toggle theme">
+                    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+    <script>
+        // Apply dark class to body once body exists
+        if (localStorage.getItem('ep_dark_mode') === '1') document.body.classList.add('dark-mode');
+        // Enable scroll-reveal for draggable sections
+        document.body.classList.add('js-ready');
+        window.addEventListener('DOMContentLoaded', () => {
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach(e => {
+                    if (e.isIntersecting) { e.target.classList.add('revealed'); io.unobserve(e.target); }
+                });
+            }, { rootMargin: '0px 0px -40px 0px', threshold: 0.05 });
+            document.querySelectorAll('.draggable-section').forEach(el => io.observe(el));
+            // Safety: reveal everything after 2s even if observer misses (e.g. content-visibility)
+            setTimeout(() => document.querySelectorAll('.draggable-section:not(.revealed)').forEach(el => el.classList.add('revealed')), 2000);
+        });
+    </script>
+
+    <main class="app-main">
+
+    <!-- HU info banner: shown when selectedCountry !== 'RO' -->
+    <div id="huPlaceholder" class="card" style="display:none;margin-bottom:18px;border-left:3px solid var(--accent);">
+        <h3 style="margin:0 0 8px 0;">🇭🇺 Hungary — data sources</h3>
+        <p style="color:var(--text-muted);margin-bottom:8px;">
+            <strong style="color:var(--text);">Live grid + forecasts:</strong> MAVIR (Hungarian TSO) — generation, load, wind/solar forecasts, fuel mix, frequency, balancing activations.
+            <strong style="color:var(--text);">Imbalance prices &amp; bids:</strong> MAVIR — daily publication, ~1-day delay; full archive XLSX has ~2-week lag.
+            <strong style="color:var(--text);">Day-ahead prices:</strong> HUPX day-ahead auction.
+            <strong style="color:var(--text);">FX:</strong> ECB official daily HUF/EUR reference rate.
+        </p>
+    </div>
+
+    <div id="sectionsContainer">
+        <!-- Imbalance Prices Table (pinned first) -->
+        <div class="draggable-section" data-section-id="imbalance-table">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+                    <div style="display:flex;align-items:baseline;gap:15px;">
+                        <h3 style="margin:0;" id="imbTitle">Imbalance Prices</h3>
+                        <span id="imbOverUnder" style="font-size:14px;font-weight:bold;"></span>
+                    </div>
+                    <span id="imbTimestamp" style="color:var(--text-muted);font-size:12px;"></span>
+                </div>
+                <div id="imbSourceHint" class="source-hint"></div>
+                <div id="imbalanceTableContainer">
+                    <p style="color:var(--text-muted);">Loading imbalance data...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merit Order – aFRR / mFRR (interval-based) -->
+        <div class="draggable-section" data-section-id="merit-order">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+                    <div style="display:flex;align-items:baseline;gap:10px;">
+                        <h3 style="margin:0;">Merit Order – aFRR / mFRR</h3>
+                        <span id="moCount" style="color:var(--text-muted);font-size:12px;"></span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <label style="font-size:13px;font-weight:bold;">Interval:</label>
+                        <select id="moInterval" onchange="renderMeritOrder()" style="min-width:150px;"></select>
+                        <button onclick="moAutoSelect()" style="background:#6c757d;padding:6px 12px;font-size:12px;" title="Jump to current interval">Now</button>
+                    </div>
+                </div>
+                <div id="moSourceHint" class="source-hint"></div>
+                <!-- Summary cards -->
+                <div id="moCards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px;"></div>
+                <!-- Imbalance detail for selected interval -->
+                <div id="moDetail" style="margin-bottom:15px;"></div>
+                <!-- Side-by-side tables: aFRR and mFRR -->
+                <div class="mo-tables-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
+                    <div>
+                        <h4 style="margin:0 0 8px 0;">aFRR Intervals</h4>
+                        <div id="moTableAfrr" style="max-height:350px;overflow:auto;"></div>
+                    </div>
+                    <div>
+                        <h4 style="margin:0 0 8px 0;">mFRR Intervals</h4>
+                        <div id="moTableMfrr" style="max-height:350px;overflow:auto;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Negative Price Prediction Alert -->
+        <div class="draggable-section" data-section-id="neg-prediction">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card" id="predictionCard">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+                    <h3 style="margin:0;">Negative Price Prediction</h3>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:12px;color:var(--text-muted);">Now: <b id="predCurrentPrice" style="font-size:13px;">-</b></span>
+                        <span id="predModelStatus" style="font-size:11px;padding:2px 8px;border-radius:10px;background:#95a5a6;color:white;">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Alert banner (hidden by default) -->
+                <div id="predAlertBanner" style="display:none;padding:10px 20px;border-radius:8px;margin-bottom:12px;font-weight:bold;font-size:14px;text-align:center;"></div>
+
+                <!-- SEN Grid Status (shown when logreg is active) -->
+                <div id="senGridStatus" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);font-size:12px;"></div>
+
+                <!-- Direction forecast table -->
+                <div id="predForecastTable" style="display:grid;gap:6px;"></div>
+            </div>
+        </div>
+
+        <!-- Market Status -->
+        <div class="draggable-section" data-section-id="market-analysis">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card" id="marketStatusCard">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">Market Status</h3>
+                    <span id="maTimestamp" style="font-size:11px;color:var(--text-muted);"></span>
+                </div>
+                <div id="marketStatusContent" style="font-size:13px;color:var(--text-muted);">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Hungarian Live Grid (MAVIR RTDW — HU-only) -->
+        <div class="draggable-section" data-section-id="hu-live-grid" style="display:none;">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+                    <h3 style="margin:0;">🇭🇺 Hungarian Live Grid</h3>
+                    <span id="huLiveGridTs" style="font-size:11px;color:var(--text-muted);"></span>
+                </div>
+                <div id="huLiveGridContent" style="font-size:13px;color:var(--text-muted);">Loading MAVIR RTDW data... (first load takes ~15s due to rate-limiting)</div>
+            </div>
+        </div>
+
+        <!-- SEN Chart -->
+        <div class="draggable-section" data-section-id="sen-chart">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <h3 style="margin:0;" id="senChartTitle">SEN Production Chart (ENTSO-E + Live)</h3>
+                    <span id="senChartStatus" style="font-size:12px;padding:3px 10px;border-radius:10px;"></span>
+                </div>
+                <div style="position:relative;min-height:350px;">
+                    <canvas id="senChart"></canvas>
+                    <div id="senChartOverlay" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--text-muted);font-size:14px;pointer-events:none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DAM Prices -->
+        <div class="draggable-section" data-section-id="dam-prices">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <h3 style="margin:0;">DAM Prices (EUR/MWh)</h3>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <input type="date" id="damDate" onchange="loadDamPrices()">
+                    </div>
+                </div>
+                <canvas id="damChart" height="80"></canvas>
+                <div id="damStats" style="margin-top:10px;font-size:13px;color:var(--text-muted);"></div>
+            </div>
+        </div>
+
+        <!-- Transelectrica SEN Table -->
+        <div class="draggable-section" data-section-id="transelectrica">
+            <div class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <h3 style="margin:0;">SEN Real-Time Production (Last 15 Minutes)</h3>
+                    <span id="transelectricaTimestamp" style="color:var(--text-muted);font-size:12px;"></span>
+                </div>
+                <div id="transelectricaContent">
+                    <p style="color:var(--text-muted);">Loading Transelectrica data...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    </main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  GLOBALS
+// ═══════════════════════════════════════════════════════════════
+let senChart = null;
+let damChart = null;
+let entsoeData = { wind: {}, solar: {}, consumption: {}, total_production: {}, total_generation: {},
+                   yesterday_consumption: {}, yesterday_production: {}, yesterday_wind: {}, yesterday_solar: {} };
+let liveHistory = { wind: {}, solar: {}, consumption: {}, production: {} };
+let liveCurrentAccum = { wind: {}, solar: {}, consumption: {}, production: {} };
+let liveCurrentIntervalKey = '';
+const imbalancePriceMap = {};
+
+let isLiveMode = true;
+let selectedDate = new Date().toISOString().split('T')[0];
+let liveIntervals = []; // Store interval IDs for live updates
+
+// ── Country state (multi-country support: RO = full, HU = ENTSO-E-only subset) ──
+let selectedCountry = (localStorage.getItem('ep_country') || 'RO').toUpperCase();
+const COUNTRY_META = {
+    RO: { label: 'Romania', flag: '🇷🇴' },
+    HU: { label: 'Hungary', flag: '🇭🇺' },
+};
+// Panels that require country-specific data sources we don't have for HU yet.
+// When selectedCountry !== 'RO' we hide these sections.
+// Merit Order + Imbalance Table are now available for HU via MAVIR (Phase 2),
+// so they stay visible for both countries — though HU has a ~2-week data lag.
+// SEN = Sistemul Energetic Național (Romania's national grid). Its "DEN"
+// (Dispecerul Energetic Național) live data lines come from Transelectrica
+// and are RO-only — don't render this chart for Hungary.
+const RO_ONLY_SECTIONS = ['neg-prediction', 'market-analysis', 'transelectrica', 'sen-chart'];
+
+// Sections that only make sense for Hungary (the inverse of RO_ONLY_SECTIONS).
+const HU_ONLY_SECTIONS = ['hu-live-grid'];
+
+// Cached FX badge (HUF/EUR). Fetched once on startup and every country
+// switch; we don't need real-time updates since ECB publishes once per day.
+let _fxBadgeHtml = '<span class="src-pill fx" title="Loading FX rate...">FX: ECB HUF/EUR</span>';
+async function refreshFxBadge() {
+    try {
+        const r = await fetch(`${SCRIPT_ROOT}/forex/huf_eur`);
+        const d = await r.json();
+        if (d && d.rate) {
+            const staleCls = d.stale ? 'stale' : 'fx';
+            const srcLabel = d.source || 'ECB';
+            const fmt = Number(d.rate).toFixed(2);
+            _fxBadgeHtml = `<span class="src-pill ${staleCls}" title="Source: ${srcLabel}, date ${d.date}, cached 1h">FX: ${fmt} HUF/EUR</span>`;
+            updateSourceHints();
+        }
+    } catch (e) { /* keep placeholder */ }
+}
+
+function updateSourceHints() {
+    // Render small "pill" badges under each section title that tell the user
+    // which data source populates that card. Country-aware.
+    const isRO = (selectedCountry === 'RO');
+    const pill = (cls, label, title = '') =>
+        `<span class="src-pill ${cls}"${title ? ` title="${title}"` : ''}>${label}</span>`;
+
+    const imbHint = document.getElementById('imbSourceHint');
+    if (imbHint) {
+        imbHint.innerHTML = isRO
+            ? pill('src', 'Source: Transelectrica')
+              + pill('archive', 'Estimated (RON)', 'Romanian settlement values are still estimates at this stage of the day.')
+            : pill('src', 'Source: MAVIR',
+                   'MAVIR (Hungarian TSO) publishes the imbalance prices; the dashboard reads them from MAVIR\'s daily feed.')
+              + pill('live', 'LIVE',
+                     'New MTUs published every ~15 min during the day; full day usually finalized late evening CET.')
+              + _fxBadgeHtml;
+        const title = document.getElementById('imbTitle');
+        if (title) title.textContent = isRO ? 'Estimated Imbalance Prices' : 'Imbalance Prices';
+    }
+
+    const moHint = document.getElementById('moSourceHint');
+    if (moHint) {
+        moHint.innerHTML = isRO
+            ? pill('src', 'Clearing: Transelectrica')
+              + pill('src', 'Activated: Transelectrica')
+              + pill('live', 'Bids: Transelectrica',
+                     'Aggregated balancing energy bids; aFRR only — Romania does not publish mFRR bids.')
+            : pill('src', 'Clearing: MAVIR (archive)')
+              + pill('src', 'Activated: MAVIR RTDW (live)')
+              + pill('live', 'Bids: MAVIR',
+                     'Aggregated balancing energy bids — aFRR + mFRR for Hungary.');
+    }
+}
+
+function applyCountryVisibility() {
+    const isRO = (selectedCountry === 'RO');
+    const container = document.getElementById('sectionsContainer');
+    document.querySelectorAll('.draggable-section').forEach(sec => {
+        const id = sec.dataset.sectionId;
+        if (RO_ONLY_SECTIONS.includes(id)) {
+            // Prediction/suggestion cards are live-only estimates — hide them on
+            // historical dates so browsing the past shows factual tables only.
+            const suggestion = (id === 'neg-prediction' || id === 'market-analysis');
+            sec.style.display = (isRO && !(suggestion && !isLiveMode)) ? '' : 'none';
+        } else if (HU_ONLY_SECTIONS.includes(id)) {
+            sec.style.display = isRO ? 'none' : '';
+        }
+    });
+    // For Hungary, imbalance prices are the primary focus — move that card to
+    // the top of the list regardless of the user's saved order.
+    if (!isRO && container) {
+        const imb = container.querySelector('[data-section-id="imbalance-table"]');
+        if (imb && container.firstElementChild !== imb) {
+            container.insertBefore(imb, container.firstElementChild);
+        }
+    }
+    const banner = document.getElementById('huPlaceholder');
+    if (banner) banner.style.display = isRO ? 'none' : '';
+    const sub = document.getElementById('brandSub');
+    if (sub) sub.textContent = `${COUNTRY_META[selectedCountry].label} · Balancing market`;
+    // Keep the browser tab title in sync with the selected country so
+    // refreshes land on the right page and users can tell HU from RO at a glance.
+    document.title = `Energy Prediction — ${COUNTRY_META[selectedCountry].label}`;
+    updateSourceHints();
+}
+
+function changeCountry() {
+    const sel = document.getElementById('countrySel');
+    if (!sel) return;
+    selectedCountry = sel.value;
+    localStorage.setItem('ep_country', selectedCountry);
+    applyCountryVisibility();
+    try { stopLiveUpdates(); } catch(e) {}
+    // Merit Order now works for HU too (via MAVIR).
+    try { loadMeritOrderData(); } catch(e) {}
+    if (selectedCountry === 'RO') {
+        // Romania-only panels + the live polling loop.
+        try { loadTranselectricaData(); } catch(e) {}
+        try { loadPrediction(); } catch(e) {}
+        try { loadMarketAnalysis(); } catch(e) {}
+        try { startLiveUpdates(); } catch(e) {}
+    }
+    // Panels that work for any country — refetch for the new context.
+    try { loadDamPrices(); } catch(e) {}
+    try { loadEntsoeData(selectedDate).then(() => buildSenChart()); } catch(e) {}
+    // HU-only panels — only fire when HU is selected; loadHuLiveGrid() guards itself.
+    try { loadHuLiveGrid(); } catch(e) {}
+}
+
+// Helper: append country to a URL's query string.
+function withCountry(url) {
+    return url + (url.includes('?') ? '&' : '?') + 'country=' + encodeURIComponent(selectedCountry);
+}
+
+const transelectricaHeaders = [
+    { key: 'timestamp', label: 'Time' },
+    { key: 'coal', label: 'Carbune' },
+    { key: 'storage', label: 'Stocare' },
+    { key: 'hydrocarbon', label: 'Hidrocarb' },
+    { key: 'hydro', label: 'Hidro' },
+    { key: 'wind', label: 'Eolian' },
+    { key: 'solar', label: 'Solar' },
+    { key: 'consumption', label: 'Consum' },
+    { key: 'production', label: 'Prod' },
+    { key: 'hungary', label: 'HU' },
+    { key: 'bulgaria', label: 'BG' },
+    { key: 'serbia', label: 'RS' },
+    { key: 'ukraine', label: 'UA' },
+    { key: 'moldova', label: 'MD' },
+    { key: 'exchange', label: 'Sold' }
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  DRAG AND DROP
+// ═══════════════════════════════════════════════════════════════
+function initDragAndDrop() {
+    const container = document.getElementById('sectionsContainer');
+    Sortable.create(container, {
+        animation: 150, handle: '.drag-handle',
+        ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
+        onEnd: () => {
+            const order = Array.from(container.querySelectorAll('.draggable-section')).map(s => s.dataset.sectionId);
+            localStorage.setItem('ep_section_order', JSON.stringify(order));
+        }
+    });
+    // The default section order changed (Estimated Imbalance Prices is now pinned
+    // to the top). Drop any stale saved order once so the new default takes effect;
+    // after this the user's own drag order persists normally.
+    const ORDER_VERSION = '3';
+    if (localStorage.getItem('ep_section_order_v') !== ORDER_VERSION) {
+        localStorage.removeItem('ep_section_order');
+        localStorage.setItem('ep_section_order_v', ORDER_VERSION);
+    }
+    const saved = localStorage.getItem('ep_section_order');
+    if (saved) {
+        try {
+            const order = JSON.parse(saved);
+            const sections = {};
+            container.querySelectorAll('.draggable-section').forEach(s => sections[s.dataset.sectionId] = s);
+            order.forEach(id => { if (sections[id]) container.appendChild(sections[id]); });
+        } catch(e) {}
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MERIT ORDER – aFRR / mFRR (interval-based)
+// ═══════════════════════════════════════════════════════════════
+function utcToLocal(utcStr) {
+    // Display the interval in the country's own market-local TZ so interval
+    // labels match the official publisher (MAVIR / Transelectrica) instead
+    // of being shifted by the viewer's browser TZ.
+    const d = new Date(utcStr);
+    const tz = selectedCountry === 'HU' ? 'Europe/Budapest' : 'Europe/Bucharest';
+    return d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', timeZone: tz });
+}
+
+function fmtNum(v, decimals=2) {
+    if (v === null || v === undefined || v === 'N/A') return '-';
+    const n = parseFloat(v);
+    return isNaN(n) ? '-' : n.toFixed(decimals);
+}
+
+// Merit order data stores
+let moMarginal = {};   // key = "HH:MM - HH:MM"
+let moActivated = {};
+let moImbalance = {};
+let moIntervalKeys = [];
+// ENTSO-E A84 clearing prices — RO only. Shape: { aFRR_Up: {'HH:MM': price}, aFRR_Down: ..., RR_Up, RR_Down }
+let moEntsoePrices = {};
+let moEntsoeCurrency = null;
+// ENTSO-E A24 aggregated bid totals (volume offered per MTU).
+let moEntsoeBidsTotal = {};   // { aFRR_Up: {HH:MM: mw}, ... }
+
+function moMakeKey(row) {
+    return utcToLocal(row.timeInterval.from) + ' - ' + utcToLocal(row.timeInterval.to);
+}
+
+async function loadMeritOrderData() {
+    try {
+        const fetches = [
+            fetch(withCountry(`${SCRIPT_ROOT}/marginal_prices?date=${selectedDate}`)),
+            fetch(withCountry(`${SCRIPT_ROOT}/activated_energy?date=${selectedDate}`)),
+            fetch(withCountry(`${SCRIPT_ROOT}/imbalance_prices?date=${selectedDate}`))
+        ];
+        // ENTSO-E A84 clearing prices (RON) — RO only, supplements DAMAS values.
+        if (selectedCountry === 'RO') {
+            fetches.push(fetch(withCountry(`${SCRIPT_ROOT}/entsoe_balancing_prices?date=${selectedDate}`)));
+        } else {
+            fetches.push(Promise.resolve(null));
+        }
+        // ENTSO-E A24 aggregated bid totals (volume offered) — both countries.
+        fetches.push(fetch(withCountry(`${SCRIPT_ROOT}/entsoe_bids_totals?date=${selectedDate}`)));
+        const responses = await Promise.all(fetches);
+        const margData = await responses[0].json();
+        const actData = await responses[1].json();
+        const imbData = await responses[2].json();
+        const entsoeBal = (responses[3] && responses[3].json) ? await responses[3].json() : { prices: {}, currency: null };
+        const entsoeBids = responses[4] ? await responses[4].json() : { bids: {} };
+        moEntsoePrices = entsoeBal.prices || {};
+        moEntsoeCurrency = entsoeBal.currency || null;
+        moEntsoeBidsTotal = entsoeBids.bids || {};
+
+        moMarginal = {}; moActivated = {}; moImbalance = {};
+        // Clear the imbalance price lookup so an empty HU response doesn't
+        // leave RO's prices in the map (used by the imbalance-price tooltips).
+        for (const k of Object.keys(imbalancePriceMap)) delete imbalancePriceMap[k];
+        const keySet = new Set();
+
+        (margData.rows || []).filter(r => r.id).forEach(r => {
+            const k = moMakeKey(r); moMarginal[k] = r; keySet.add(k);
+        });
+        (actData.rows || []).filter(r => r.id).forEach(r => {
+            const k = moMakeKey(r); moActivated[k] = r; keySet.add(k);
+        });
+        (imbData.rows || []).filter(r => r.id).forEach(r => {
+            const k = moMakeKey(r); moImbalance[k] = r; keySet.add(k);
+            const tk = utcToLocal(r.timeInterval.from);
+            imbalancePriceMap[tk] = { neg: r.estimatedPriceNegativeImbalance, pos: r.estimatedPricePositiveImbalance };
+        });
+
+        moIntervalKeys = Array.from(keySet).sort();
+
+        // Populate interval dropdown
+        const sel = document.getElementById('moInterval');
+        const prevVal = sel.value;
+        sel.innerHTML = moIntervalKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+        if (prevVal && moIntervalKeys.includes(prevVal)) sel.value = prevVal;
+        else moAutoSelect();
+
+        document.getElementById('moCount').textContent =
+            `(${moIntervalKeys.length} intervals available)`;
+
+        if (!moIntervalKeys.length) {
+            // No data for this date/country — clear stale content so users
+            // don't mistake the previous render (e.g. RO) for the current
+            // selection. MAVIR has a ~2-week publication lag for HU.
+            const emptyMsg = selectedCountry === 'HU'
+                ? 'No MAVIR data yet for this date (publication lag ~2 weeks).'
+                : 'No balancing data available for this date.';
+            const empty = `<p style="color:var(--text-muted);padding:8px;">${emptyMsg}</p>`;
+            const cards = document.getElementById('moCards');          if (cards)  cards.innerHTML  = empty;
+            const detail = document.getElementById('moDetail');        if (detail) detail.innerHTML = empty;
+            const afrrT = document.getElementById('moTableAfrr');      if (afrrT)  afrrT.innerHTML  = empty;
+            const mfrrT = document.getElementById('moTableMfrr');      if (mfrrT)  mfrrT.innerHTML  = empty;
+            renderImbalanceTable();
+            return;
+        }
+
+        renderMeritOrder();
+        renderImbalanceTable();
+    } catch(e) { console.error('Merit order error:', e); }
+}
+
+function moAutoSelect() {
+    const sel = document.getElementById('moInterval');
+    if (!moIntervalKeys.length) return;
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(Math.floor(now.getMinutes() / 15) * 15).padStart(2, '0');
+    const prefix = h + ':' + m;
+    const match = moIntervalKeys.find(k => k.startsWith(prefix));
+    if (match) sel.value = match;
+    else sel.value = moIntervalKeys[moIntervalKeys.length - 1];
+    renderMeritOrder();
+}
+
+function renderMeritOrder() {
+    const selKey = document.getElementById('moInterval').value;
+    if (!selKey) return;
+    const marg = moMarginal[selKey] || {};
+    const act = moActivated[selKey] || {};
+    const imb = moImbalance[selKey] || {};
+
+    renderMoCards(marg, act, imb);
+    renderMoDetail(imb);
+    renderMoTables(selKey);
+}
+
+function moMfrrPrice(marg, dir) {
+    // mFRR_Up/Down are usually null; real data is in _Scheduled/_Direct
+    return marg['mFRR_' + dir] ?? marg['mFRR_' + dir + '_Scheduled'] ?? marg['mFRR_' + dir + '_Direct'] ?? null;
+}
+
+function renderMoCards(marg, act, imb) {
+    const cards = document.getElementById('moCards');
+    // ENTSO-E A84 clearing prices are keyed by local HH:MM start. Extract from
+    // the selected interval key ("HH:MM - HH:MM"). Used for RO mFRR cross-check —
+    // mFRR isn't in ENTSO-E for RO so those cards fall back to the DAMAS value.
+    const selKey = document.getElementById('moInterval').value || '';
+    const startHHMM = selKey.split(' - ')[0] || '';
+    const ep = moEntsoePrices || {};
+    const eAfrrUp = (ep.aFRR_Up || {})[startHHMM];
+    const eAfrrDn = (ep.aFRR_Down || {})[startHHMM];
+    // Aggregated bid volume offered per MTU (ENTSO-E A24), MW.
+    const bt = moEntsoeBidsTotal || {};
+    const tAfrrUp = (bt.aFRR_Up || {})[startHHMM];
+    const tAfrrDn = (bt.aFRR_Down || {})[startHHMM];
+    const tMfrrUp = (bt.mFRR_Up || {})[startHHMM];
+    const tMfrrDn = (bt.mFRR_Down || {})[startHHMM];
+    // Currency label per country. RO: DAMAS/ENTSO-E both publish in RON.
+    // HU: mavir_client converts HUF/kWh → EUR/MWh before it reaches the frontend.
+    const priceCurrency = selectedCountry === 'RO'
+        ? (moEntsoeCurrency || 'RON')
+        : 'EUR/MWh';
+
+    // Prefer ENTSO-E A84 value for aFRR when available (authoritative currency),
+    // fall back to DAMAS marginal. mFRR always from DAMAS (not published by ENTSO-E RO).
+    const items = [
+        { label: 'aFRR DOWN', clearing: (eAfrrDn != null ? eAfrrDn : marg.aFRR_Down),
+          mw: act.aFRR_Down, bidTotal: tAfrrDn, q: imb.sumQdn, qCost: imb.sumQdownPdn,
+          color: '#e74c3c', bg: 'rgba(231,76,60,0.08)', border: '#e74c3c' },
+        { label: 'aFRR UP', clearing: (eAfrrUp != null ? eAfrrUp : marg.aFRR_Up),
+          mw: act.aFRR_Up, bidTotal: tAfrrUp, q: imb.sumQup, qCost: imb.sumQupPup,
+          color: '#27ae60', bg: 'rgba(39,174,96,0.08)', border: '#27ae60' },
+        { label: 'mFRR DOWN', clearing: moMfrrPrice(marg, 'Down'),
+          pSched: marg.mFRR_Down_Scheduled, pDirect: marg.mFRR_Down_Direct, mw: act.mFRR_Down,
+          bidTotal: tMfrrDn,
+          color: '#e74c3c', bg: 'rgba(231,76,60,0.08)', border: '#e74c3c' },
+        { label: 'mFRR UP', clearing: moMfrrPrice(marg, 'Up'),
+          pSched: marg.mFRR_Up_Scheduled, pDirect: marg.mFRR_Up_Direct, mw: act.mFRR_Up,
+          bidTotal: tMfrrUp,
+          color: '#27ae60', bg: 'rgba(39,174,96,0.08)', border: '#27ae60' },
+    ];
+    cards.innerHTML = items.map(c => {
+        const clearingVal = fmtNum(c.clearing, 2);
+        const mwVal = fmtNum(c.mw);
+        const qVal = c.q != null ? fmtNum(c.q) : null;
+        const qCostVal = c.qCost != null ? fmtNum(c.qCost, 0) : null;
+        let extra = '';
+        if (qVal !== null) extra += `<div>Sum Q: <b>${qVal}</b> MW</div>`;
+        if (qCostVal !== null) extra += `<div>Q*P: <b>${qCostVal}</b></div>`;
+        if (c.pSched !== undefined) {
+            extra += `<div style="font-size:11px;margin-top:4px;color:var(--text-muted);">Sched: <b>${fmtNum(c.pSched)}</b> | Direct: <b>${fmtNum(c.pDirect)}</b></div>`;
+        }
+        const bidTotalLine = (c.bidTotal != null)
+            ? `<div>Total bid: <b>${fmtNum(c.bidTotal, 0)}</b> MW <span style="font-size:10px;color:var(--text-muted);">(${selectedCountry === 'HU' ? 'MAVIR' : 'Transelectrica'})</span></div>`
+            : '';
+        return `<div style="border:2px solid ${c.border};border-radius:8px;padding:12px;background:${c.bg};">
+            <div style="color:${c.color};font-weight:bold;font-size:13px;margin-bottom:6px;">${c.label}</div>
+            <div>Clearing: <b>${clearingVal}</b> ${priceCurrency}</div>
+            <div>Activated: <b>${mwVal}</b> MW</div>
+            ${bidTotalLine}
+            ${extra}
+        </div>`;
+    }).join('');
+}
+
+function renderMoDetail(imb) {
+    const el = document.getElementById('moDetail');
+    if (!imb.id) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">No imbalance data for this interval</div>'; return; }
+    const isDark = document.body.classList.contains('dark-mode');
+    const bg = isDark ? 'var(--table-alt-bg)' : '#f8f9fa';
+    const sysImb = parseFloat(imb.estimatedSystemImbalance);
+    const sysColor = isNaN(sysImb) ? '' : (sysImb >= 0 ? 'color:#27ae60;' : 'color:#e74c3c;');
+    const typeLabel = imb.type || '-';
+    // HU: prefer EUR-converted prices (live ECB rate). RO: native RON values.
+    const isHU_d = selectedCountry === 'HU';
+    const negVal = isHU_d ? imb.estimatedPriceNegativeImbalanceEUR : imb.estimatedPriceNegativeImbalance;
+    const posVal = isHU_d ? imb.estimatedPricePositiveImbalanceEUR : imb.estimatedPricePositiveImbalance;
+    const pNeg = fmtNum(negVal);
+    const pPos = fmtNum(posVal);
+    const negN = parseFloat(negVal);
+    const posN = parseFloat(posVal);
+    const negStyle = !isNaN(negN) && negN < 0 ? 'color:#e74c3c;font-weight:bold;' : 'font-weight:bold;';
+    const posStyle = !isNaN(posN) && posN < 0 ? 'color:#e74c3c;font-weight:bold;' : 'font-weight:bold;';
+
+    const detailCcy = isHU_d ? 'EUR' : 'RON';
+    el.innerHTML = `<div style="background:${bg};border-radius:6px;padding:10px 15px;display:flex;flex-wrap:wrap;gap:20px;font-size:13px;">
+        <div>Imbal Price (neg): <span style="${negStyle}">${pNeg}</span> <span style="color:var(--text-muted);font-size:11px;">${detailCcy}</span></div>
+        <div>Imbal Price (pos): <span style="${posStyle}">${pPos}</span> <span style="color:var(--text-muted);font-size:11px;">${detailCcy}</span></div>
+        <div>Type: <b>${typeLabel}</b></div>
+        <div>Sys Imbalance: <span style="${sysColor}font-weight:bold;">${fmtNum(imb.estimatedSystemImbalance)}</span> MW</div>
+        <div>Consumption: <b>${fmtNum(imb.realizedConsumption, 0)}</b> MW</div>
+        <div>FCR: <b>${fmtNum(imb.fcr)}</b> MW</div>
+        <div>Netting Imp: <b>${fmtNum(imb.imbalanceNettingImport)}</b></div>
+        <div>Netting Exp: <b>${fmtNum(imb.imbalanceNettingExport)}</b></div>
+    </div>`;
+}
+
+function renderMoTables(selKey) {
+    const isDark = document.body.classList.contains('dark-mode');
+    const hdrBg = isDark ? 'var(--table-header-bg)' : '#f8f9fa';
+    const altBg = isDark ? 'var(--table-alt-bg)' : '#f8f9fa';
+    const baseBg = isDark ? 'var(--card-bg)' : '#fff';
+    const borderC = isDark ? 'var(--table-border)' : '#dee2e6';
+    const selBgUp = isDark ? 'rgba(39,174,96,0.2)' : 'rgba(39,174,96,0.15)';
+    const selBgDn = isDark ? 'rgba(231,76,60,0.2)' : 'rgba(231,76,60,0.1)';
+
+    function buildTable(type) {
+        const upKey = type + '_Up';
+        const dnKey = type + '_Down';
+        const isMfrr = (type === 'mFRR');
+        // mFRR gets extra Scheduled/Direct columns
+        const upCols = isMfrr ? 4 : 2;
+        const dnCols = isMfrr ? 4 : 2;
+
+        let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">`;
+        html += `<thead><tr>`;
+        html += `<th rowspan="2" style="padding:6px 4px;border-bottom:2px solid ${borderC};font-size:11px;position:sticky;top:0;background:${hdrBg};z-index:2;">Interval</th>`;
+        html += `<th colspan="${upCols}" style="padding:4px;text-align:center;border-bottom:1px solid ${borderC};font-size:11px;position:sticky;top:0;background:${hdrBg};z-index:2;color:#27ae60;">UP</th>`;
+        html += `<th colspan="${dnCols}" style="padding:4px;text-align:center;border-bottom:1px solid ${borderC};font-size:11px;position:sticky;top:0;background:${hdrBg};z-index:2;color:#e74c3c;">DOWN</th>`;
+        html += `</tr><tr>`;
+        if (isMfrr) {
+            ['Sched', 'Direct', 'MW', 'Sched', 'Direct', 'MW'].forEach(h => {
+                html += `<th style="padding:4px;text-align:right;border-bottom:2px solid ${borderC};font-size:10px;position:sticky;top:20px;background:${hdrBg};z-index:1;">${h}</th>`;
+            });
+        } else {
+            ['Price', 'MW', 'Price', 'MW'].forEach(h => {
+                html += `<th style="padding:4px;text-align:right;border-bottom:2px solid ${borderC};font-size:10px;position:sticky;top:20px;background:${hdrBg};z-index:1;">${h}</th>`;
+            });
+        }
+        html += `</tr></thead><tbody>`;
+
+        moIntervalKeys.forEach((k, i) => {
+            const marg = moMarginal[k] || {};
+            const act = moActivated[k] || {};
+            const isSel = (k === selKey);
+            let bg = i % 2 === 0 ? baseBg : altBg;
+            let rowStyle = '';
+            if (isSel) {
+                bg = selBgUp;
+                rowStyle = 'font-weight:bold;';
+            }
+            const upMW = act[upKey];
+            const dnMW = act[dnKey];
+
+            html += `<tr data-key="${k}" ${isSel ? 'data-selected="1"' : ''} style="background:${bg};${rowStyle}cursor:pointer;" onclick="document.getElementById('moInterval').value='${k}';renderMeritOrder();">`;
+            html += `<td style="padding:3px 4px;border-bottom:1px solid ${borderC};font-size:11px;">${k}</td>`;
+
+            const cellBase = `padding:3px 4px;text-align:right;border-bottom:1px solid ${borderC};`;
+
+            if (isMfrr) {
+                // UP: Scheduled, Direct, MW
+                const uSched = marg.mFRR_Up_Scheduled;
+                const uDirect = marg.mFRR_Up_Direct;
+                let uSchedStyle = cellBase;
+                const uSchedN = parseFloat(uSched);
+                if (!isNaN(uSchedN) && uSchedN !== 0) { uSchedStyle += isSel ? `background:${selBgUp};color:#27ae60;font-weight:bold;` : 'color:#27ae60;'; }
+                html += `<td style="${uSchedStyle}">${fmtNum(uSched)}</td>`;
+                let uDirectStyle = cellBase;
+                const uDirectN = parseFloat(uDirect);
+                if (!isNaN(uDirectN) && uDirectN !== 0) { uDirectStyle += isSel ? `background:${selBgUp};color:#27ae60;font-weight:bold;` : 'color:#27ae60;'; }
+                html += `<td style="${uDirectStyle}">${fmtNum(uDirect)}</td>`;
+                html += `<td style="${cellBase}">${fmtNum(upMW)}</td>`;
+                // DN: Scheduled, Direct, MW
+                const dSched = marg.mFRR_Down_Scheduled;
+                const dDirect = marg.mFRR_Down_Direct;
+                let dSchedStyle = cellBase;
+                const dSchedN = parseFloat(dSched);
+                if (!isNaN(dSchedN) && dSchedN !== 0) { dSchedStyle += isSel ? `background:${selBgDn};color:#e74c3c;font-weight:bold;` : 'color:#e74c3c;'; }
+                html += `<td style="${dSchedStyle}">${fmtNum(dSched)}</td>`;
+                let dDirectStyle = cellBase;
+                const dDirectN = parseFloat(dDirect);
+                if (!isNaN(dDirectN) && dDirectN !== 0) { dDirectStyle += isSel ? `background:${selBgDn};color:#e74c3c;font-weight:bold;` : 'color:#e74c3c;'; }
+                html += `<td style="${dDirectStyle}">${fmtNum(dDirect)}</td>`;
+                html += `<td style="${cellBase}">${fmtNum(dnMW)}</td>`;
+            } else {
+                // aFRR: Price, MW
+                const upPrice = marg[upKey];
+                const dnPrice = marg[dnKey];
+                let upPriceStyle = cellBase;
+                const upN = parseFloat(upPrice);
+                if (!isNaN(upN) && upN !== 0) { upPriceStyle += isSel ? `background:${selBgUp};color:#27ae60;font-weight:bold;` : 'color:#27ae60;'; }
+                html += `<td style="${upPriceStyle}">${fmtNum(upPrice)}</td>`;
+                html += `<td style="${cellBase}">${fmtNum(upMW)}</td>`;
+                let dnPriceStyle = cellBase;
+                const dnN = parseFloat(dnPrice);
+                if (!isNaN(dnN) && dnN !== 0) { dnPriceStyle += isSel ? `background:${selBgDn};color:#e74c3c;font-weight:bold;` : 'color:#e74c3c;'; }
+                html += `<td style="${dnPriceStyle}">${fmtNum(dnPrice)}</td>`;
+                html += `<td style="${cellBase}">${fmtNum(dnMW)}</td>`;
+            }
+
+            html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        return html;
+    }
+
+    document.getElementById('moTableAfrr').innerHTML = buildTable('aFRR');
+    document.getElementById('moTableMfrr').innerHTML = buildTable('mFRR');
+
+    // Auto-scroll selected row into view — inside its own table container only,
+    // never the page. scrollIntoView() bubbles up to the window, so on every
+    // 15s live refresh it yanked the whole page to re-center this row (the
+    // "refresh jumps to the middle of the page" annoyance). Adjusting the
+    // container's own scrollTop keeps the row centered without moving the page.
+    ['moTableAfrr', 'moTableMfrr'].forEach(id => {
+        const container = document.getElementById(id);
+        const sel = container.querySelector('tr[data-selected]');
+        if (sel) {
+            const cRect = container.getBoundingClientRect();
+            const sRect = sel.getBoundingClientRect();
+            container.scrollTop += (sRect.top - cRect.top) - (container.clientHeight - sel.clientHeight) / 2;
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ESTIMATED IMBALANCE PRICES TABLE
+// ═══════════════════════════════════════════════════════════════
+function imbDateLabel(utcStr) {
+    const d = new Date(utcStr);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    // Render in the country's own market TZ (CET/CEST for HU, EET/EEST for RO)
+    // so the HH:MM labels match the ENTSO-E / MAVIR / Transelectrica source.
+    const tz = selectedCountry === 'HU' ? 'Europe/Budapest' : 'Europe/Bucharest';
+    const opts = { timeZone: tz };
+    const day = d.toLocaleDateString('en-GB', { ...opts, day: '2-digit' });
+    const mon = months[parseInt(d.toLocaleDateString('en-GB', { ...opts, month: 'numeric' })) - 1];
+    const time = d.toLocaleTimeString('ro-RO', { ...opts, hour: '2-digit', minute: '2-digit' });
+    return { day, mon, time };
+}
+
+function renderImbalanceTable() {
+    const container = document.getElementById('imbalanceTableContainer');
+    const tsEl = document.getElementById('imbTimestamp');
+    const ouEl = document.getElementById('imbOverUnder');
+    if (!moIntervalKeys.length) {
+        container.innerHTML = '<p style="color:var(--text-muted);">No imbalance data available</p>';
+        return;
+    }
+
+    const isDark = document.body.classList.contains('dark-mode');
+    const hdrBg = isDark ? 'var(--table-header-bg)' : '#f8f9fa';
+    const baseBg = isDark ? 'var(--card-bg)' : '#fff';
+    const altBg = isDark ? 'var(--table-alt-bg)' : '#f8f9fa';
+    const borderC = isDark ? 'var(--table-border)' : '#dee2e6';
+    const textC = isDark ? 'var(--text)' : '#2c3e50';
+
+    // HU prices come from ENTSO-E in HUF; the column shows the EUR-converted
+    // value (live ECB rate). RO prices come from DAMAS already in RON which
+    // we display as-is. Single price column per direction; no state pill.
+    const priceCcy = selectedCountry === 'HU' ? 'EUR' : 'RON';
+    const isHU = selectedCountry === 'HU';
+    const allCols = [
+        { key: 'time', label: 'Time', align: 'left' },
+        { key: 'negPrice', label: `Imbal Price (${priceCcy})`, align: 'right',
+          tip: 'Estimated imbalance price. RO uses a SINGLE price — the deficit and surplus values are identical, so one column.' },
+        { key: 'afrrUp', label: 'aFRR Up', align: 'right' },
+        { key: 'afrrDn', label: 'aFRR Dn', align: 'right' },
+        { key: 'mfrrUp', label: 'mFRR Up', align: 'right' },
+        { key: 'mfrrDn', label: 'mFRR Dn', align: 'right' },
+        { key: 'pAfrrUp', label: 'P aFRR Up', align: 'right' },
+        { key: 'pAfrrDn', label: 'P aFRR Dn', align: 'right' },
+        { key: 'pMfrrUp', label: 'P mFRR Up', align: 'right' },
+        { key: 'pMfrrDn', label: 'P mFRR Dn', align: 'right' },
+        { key: 'sysImbal', label: 'Sys Imbal', align: 'right',
+          tip: 'System imbalance (MW): + = surplus (system long), - = deficit (system short). The overall grid mismatch — separate from what was actually activated.' },
+        { key: 'netImport', label: 'Net Import', align: 'right' },
+        { key: 'netExport', label: 'Net Export', align: 'right' },
+        { key: 'imbalance', label: 'Net Activ', align: 'right',
+          tip: 'Net activated balancing energy = (aFRR + mFRR up) minus (down), in MW. How much net regulation the TSO actually deployed this quarter.' },
+        { key: 'cost', label: `Cost (${priceCcy})`, align: 'right',
+          tip: 'Total balancing cost this quarter, in Lei: each activated energy volume x its price, summed.' },
+    ];
+
+    // Build row data and compute Over/Under
+    let sumOverPrice = 0, sumOverVol = 0, sumUnderPrice = 0, sumUnderVol = 0;
+    let latestTimestamp = null;
+
+    const tableRows = [];
+    // Chronological order: 00:00 → 23:45
+    const keys = [...moIntervalKeys];
+
+    keys.forEach(k => {
+        const imb = moImbalance[k] || {};
+        const act = moActivated[k] || {};
+        const marg = moMarginal[k] || {};
+
+        if (!imb.id && !act.id && !marg.id) return;
+
+        // Time label: "DD Mon HH:MM - HH:MM"
+        let timeLabel = k;
+        if (imb.timeInterval) {
+            const f = imbDateLabel(imb.timeInterval.from);
+            const t = imbDateLabel(imb.timeInterval.to);
+            timeLabel = `${f.day} ${f.mon} ${f.time} - ${t.time}`;
+            if (!latestTimestamp) latestTimestamp = imb.timeInterval.to;
+        } else if (marg.timeInterval) {
+            const f = imbDateLabel(marg.timeInterval.from);
+            const t = imbDateLabel(marg.timeInterval.to);
+            timeLabel = `${f.day} ${f.mon} ${f.time} - ${t.time}`;
+        }
+
+        // For HU display the EUR-converted price (server converts HUF→EUR
+        // using the live ECB reference rate). For RO use the native RON value.
+        const negP = (selectedCountry === 'HU')
+            ? imb.estimatedPriceNegativeImbalanceEUR
+            : imb.estimatedPriceNegativeImbalance;
+        const posP = (selectedCountry === 'HU')
+            ? imb.estimatedPricePositiveImbalanceEUR
+            : imb.estimatedPricePositiveImbalance;
+        // DAMAS reports these as ENERGY (MWh) activated/imbalanced over the 15-min
+        // ISP. Multiply by 4 (= ÷ 0.25 h) to display average power in MW. Verified
+        // against DAMAS raw + the production dashboard: e.g. estimatedSystemImbalance
+        // 80.991 MWh → 323.964 MW, aFRR_Down 46.866 → 187.464. Prices (Lei/MWh) and
+        // Cost (Lei) are NOT scaled. null stays null so "no data" never becomes 0.
+        const toMW = v => (v == null ? null : v * 4);
+        const sysImb = toMW(imb.estimatedSystemImbalance);
+        const afrrUp = toMW(act.aFRR_Up);
+        const afrrDn = toMW(act.aFRR_Down);
+        const mfrrUp = toMW(act.mFRR_Up);
+        const mfrrDn = toMW(act.mFRR_Down);
+        // A reserve's marginal price is only meaningful when that direction was
+        // actually activated. DAMAS still publishes a price on the idle side
+        // (e.g. aFRR Up = 777 while the system is long and up wasn't called),
+        // which renders as a phantom value. Gate each price on its OWN activated
+        // volume (raw MWh > 0.1) so idle-side prices blank out. Verified against
+        // ENTSO-E A84 (0 disagreements) — the kept prices are the real ones.
+        const ACT_EPS = 0.1;
+        const priceIf = (vol, price) => (vol != null && vol > ACT_EPS ? price : null);
+        const pAfrrUp = priceIf(act.aFRR_Up,   marg.aFRR_Up);
+        const pAfrrDn = priceIf(act.aFRR_Down, marg.aFRR_Down);
+        const pMfrrUp = priceIf(act.mFRR_Up,   marg.mFRR_Up ?? marg.mFRR_Up_Scheduled);
+        const pMfrrDn = priceIf(act.mFRR_Down, marg.mFRR_Down ?? marg.mFRR_Down_Scheduled);
+        const netImp = toMW(imb.imbalanceNettingImport);
+        const netExp = toMW(imb.imbalanceNettingExport);
+
+        // Imbalance = sumQup - sumQdn (net activated energy) → MW
+        const qUp = imb.sumQup;
+        const qDn = imb.sumQdn;
+        const imbalance = (qUp != null && qDn != null) ? (qUp - qDn) * 4 : null;
+
+        // Cost = net balancing cost (sumQupPup + sumQdownPdn)
+        const costUp = imb.sumQupPup;
+        const costDn = imb.sumQdownPdn;
+        const cost = (costUp != null || costDn != null) ? (costUp || 0) + (costDn || 0) : null;
+
+        // Over/Under weighted averages
+        if (sysImb != null && sysImb > 0 && posP != null) {
+            sumOverPrice += posP * sysImb;
+            sumOverVol += sysImb;
+        } else if (sysImb != null && sysImb < 0 && negP != null) {
+            sumUnderPrice += negP * Math.abs(sysImb);
+            sumUnderVol += Math.abs(sysImb);
+        }
+
+        const hasData = typeof negP === 'number';
+        // EUR companions populated only for HU (imbalance adapter emits both).
+        const negPriceEur = imb.estimatedPriceNegativeImbalanceEUR;
+        const posPriceEur = imb.estimatedPricePositiveImbalanceEUR;
+        const state = imb.type;  // LONG | SHORT | SINGLE | DUAL — HU only
+        tableRows.push({ timeLabel, negP, posP, negPriceEur, posPriceEur, state,
+            afrrUp, afrrDn, mfrrUp, mfrrDn,
+            pAfrrUp, pAfrrDn, pMfrrUp, pMfrrDn, sysImb, netImp, netExp, imbalance, cost, hasData });
+    });
+
+    // Drop columns that are empty across every row so HU (which lacks
+    // realizedConsumption, FCR, netting, and — for current-month — marginal
+    // prices) doesn't show a sea of blanks. `time` is always kept.
+    const colHasAnyValue = (col) => col.key === 'time' ||
+        tableRows.some(r => {
+            if (col.key === 'negPrice') return r.negP != null;
+            if (col.key === 'posPrice') return r.posP != null;
+            if (col.key === 'negPriceEur') return r.negPriceEur != null;
+            if (col.key === 'posPriceEur') return r.posPriceEur != null;
+            if (col.key === 'state') return !!r.state;
+            if (col.key === 'afrrUp') return r.afrrUp != null;
+            if (col.key === 'afrrDn') return r.afrrDn != null;
+            if (col.key === 'mfrrUp') return r.mfrrUp != null;
+            if (col.key === 'mfrrDn') return r.mfrrDn != null;
+            if (col.key === 'pAfrrUp') return r.pAfrrUp != null;
+            if (col.key === 'pAfrrDn') return r.pAfrrDn != null;
+            if (col.key === 'pMfrrUp') return r.pMfrrUp != null;
+            if (col.key === 'pMfrrDn') return r.pMfrrDn != null;
+            if (col.key === 'sysImbal') return r.sysImb != null;
+            if (col.key === 'netImport') return r.netImp != null;
+            if (col.key === 'netExport') return r.netExp != null;
+            if (col.key === 'imbalance') return r.imbalance != null;
+            if (col.key === 'cost') return r.cost != null;
+            return false;
+        });
+    const cols = allCols.filter(colHasAnyValue);
+
+    // Over / Under header
+    const overAvg = sumOverVol > 0 ? (sumOverPrice / sumOverVol) : null;
+    const underAvg = sumUnderVol > 0 ? (sumUnderPrice / sumUnderVol) : null;
+    let ouParts = [];
+    if (overAvg !== null) ouParts.push(`<span style="color:#27ae60;">Over ${overAvg >= 0 ? '+' : ''}${overAvg.toFixed(2)}</span>`);
+    if (underAvg !== null) ouParts.push(`<span style="color:#e74c3c;">Under ${underAvg >= 0 ? '+' : ''}${underAvg.toFixed(2)}</span>`);
+    ouEl.innerHTML = ouParts.length ? ouParts.join(' / ') : '';
+
+    // Show "Published up to HH:MM" — the highest-MTU timestamp we received.
+    // For HU this is the actual ENTSO-E publication frontier (typically
+    // 15-30 min behind real time during the day, fully populated late
+    // evening). Helps users tell "no fresh data" from "all data fresh".
+    if (latestTimestamp) {
+        const d = new Date(latestTimestamp);
+        const tz = selectedCountry === 'HU' ? 'Europe/Budapest' : 'Europe/Bucharest';
+        const time = d.toLocaleTimeString('ro-RO', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+        const date = d.toLocaleDateString('ro-RO', { timeZone: tz, day: '2-digit', month: 'short' });
+        const ageMin = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+        const ageStr = ageMin < 60 ? `${ageMin} min ago` : `${(ageMin/60).toFixed(1)} h ago`;
+        tsEl.textContent = `Published up to ${date} ${time} (${ageStr})`;
+    }
+
+    // Cell formatter — positives green, negatives red, zero muted, empty
+    // as a faded em-dash. Tabular numerals so digits align column-wise.
+    function fmtImb(val, decimals = 2) {
+        if (val === null || val === undefined || val === '') return '<span class="num-empty">—</span>';
+        const n = parseFloat(val);
+        if (isNaN(n)) return '<span class="num-empty">—</span>';
+        if (n === 0) return '<span class="num-zero">0.00</span>';
+        const text = Math.abs(n) >= 1000
+            ? n.toLocaleString('en-US', { maximumFractionDigits: decimals, minimumFractionDigits: decimals })
+            : n.toFixed(decimals);
+        return n < 0
+            ? `<span class="num-neg">${text}</span>`
+            : `<span class="num-pos">${text}</span>`;
+    }
+
+    // Render a clean table with no group separators (the visual rhythm
+    // comes from the every-4th-row separator + tabular alignment). This
+    // pulls clutter out of the grid so the numbers carry the page.
+    const nowDate = new Date();
+    const curHH = String(nowDate.getHours()).padStart(2, '0');
+    const curMM = String(Math.floor(nowDate.getMinutes() / 15) * 15).padStart(2, '0');
+    const currentQLabel = `${curHH}:${curMM}`;
+
+    let html = `<table class="imb-table"><thead><tr>`;
+    cols.forEach(c => {
+        html += `<th style="text-align:${c.align};"${c.tip ? ` title="${c.tip}"` : ''}>${c.label}</th>`;
+    });
+    html += `</tr></thead><tbody>`;
+
+    let currentRowId = null;
+    tableRows.forEach((row) => {
+        const isCurrent = row.timeLabel && row.timeLabel.includes(currentQLabel + ' -');
+        const rowId = isCurrent ? 'imbCurrentRow' : '';
+        if (isCurrent) currentRowId = rowId;
+
+        html += `<tr ${rowId ? `id="${rowId}"` : ''} class="${isCurrent ? 'imb-current' : ''}">`;
+        const rowValForKey = {
+            negPrice: row.negP, posPrice: row.posP,
+            negPriceEur: row.negPriceEur, posPriceEur: row.posPriceEur,
+            afrrUp: row.afrrUp, afrrDn: row.afrrDn, mfrrUp: row.mfrrUp, mfrrDn: row.mfrrDn,
+            pAfrrUp: row.pAfrrUp, pAfrrDn: row.pAfrrDn, pMfrrUp: row.pMfrrUp, pMfrrDn: row.pMfrrDn,
+            sysImbal: row.sysImb, netImport: row.netImp, netExport: row.netExp,
+            imbalance: row.imbalance, cost: row.cost,
+        };
+        cols.forEach(col => {
+            if (col.key === 'time') {
+                html += `<td class="imb-time" style="text-align:left;">${isCurrent ? '<span class="now-dot" title="Current quarter"></span>' : ''}${row.timeLabel}</td>`;
+                return;
+            }
+            html += `<td style="text-align:${col.align};">${fmtImb(rowValForKey[col.key], 2)}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = tableRows.length
+        ? html
+        : '<div style="padding:48px 20px;text-align:center;color:var(--text-muted);font-size:13px;">No imbalance data published for this date yet.</div>';
+
+    // Auto-scroll table container to current quarter (without moving the page)
+    if (currentRowId) {
+        setTimeout(() => {
+            const el = document.getElementById(currentRowId);
+            if (el && container) {
+                const elTop = el.offsetTop - container.offsetTop;
+                container.scrollTop = elTop - container.clientHeight / 2 + el.clientHeight / 2;
+            }
+        }, 100);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TRANSELECTRICA TABLE
+// ═══════════════════════════════════════════════════════════════
+function formatRow(row, isLive = false) {
+    const bg = isLive ? 'blue' : '#fff';
+    const tc = isLive ? 'white' : 'inherit';
+    let html = `<tr style="background-color:${bg};color:${tc};">`;
+    transelectricaHeaders.forEach((h, idx) => {
+        const align = idx === 0 ? 'left' : 'right';
+        let style = `padding:4px;text-align:${align};border-bottom:1px solid #dee2e6;`;
+        let value = row[h.key];
+        if (isLive) style += 'font-weight:bold;';
+        if (idx === 0) {
+            if (value) { const p = value.split(' '); value = p.length > 1 ? p[1] : value; }
+            if (isLive) value = '\u26A1 ' + value;
+        } else if (value != null) {
+            value = parseFloat(value).toFixed(0);
+            if (h.key === 'exchange' && !isLive) {
+                const n = parseFloat(value);
+                style += `color:${n < 0 ? '#e74c3c' : n > 0 ? '#27ae60' : '#2c3e50'};`;
+            }
+        } else { value = '-'; }
+        html += `<td style="${style}">${value}</td>`;
+    });
+    return html + '</tr>';
+}
+
+function formatEntsoeRows() {
+    const now = new Date();
+    const cm = Math.floor(now.getMinutes() / 15) * 15;
+    const ch = now.getHours();
+    const curKey = String(ch).padStart(2,'0') + ':' + String(cm).padStart(2,'0');
+    let nem = cm + 15, neh = ch;
+    if (nem >= 60) { nem = 0; neh = (neh + 1) % 24; }
+    const nxtKey = String(neh).padStart(2,'0') + ':' + String(nem).padStart(2,'0');
+    let nenem = nem + 15, neneh = neh;
+    if (nenem >= 60) { nenem = 0; neneh = (neneh + 1) % 24; }
+    const nxtEnd = String(neneh).padStart(2,'0') + ':' + String(nenem).padStart(2,'0');
+
+    function buildRow(timeKey, endKey, bgColor, textColor) {
+        const w = entsoeData.wind[timeKey];
+        const s = entsoeData.solar[timeKey];
+        const cons = entsoeData.consumption[timeKey];       // Load = Consumption
+        const prod = entsoeData.total_production[timeKey];  // Generation = Production
+        if (cons === undefined && prod === undefined) return '';
+        const exch = (prod !== undefined && cons !== undefined) ? cons - prod : undefined;
+
+        let row = `<tr style="background-color:${bgColor};">`;
+        transelectricaHeaders.forEach((h, idx) => {
+            let cell = '', style = `padding:4px;border-bottom:1px solid #dee2e6;color:${textColor};`;
+            if (idx === 0) { style += 'font-weight:bold;'; cell = `\uD83C\uDDEA\uD83C\uDDFA ${timeKey} - ${endKey}`; }
+            else if (idx === 5) { style += 'text-align:right;font-weight:bold;'; cell = w !== undefined ? w.toFixed(0) : '-'; }
+            else if (idx === 6) { style += 'text-align:right;font-weight:bold;'; cell = s !== undefined ? s.toFixed(0) : '-'; }
+            else if (idx === 7) { style += 'text-align:right;font-weight:bold;'; cell = cons !== undefined ? cons.toFixed(0) : '-'; }
+            else if (idx === 8) { style += 'text-align:right;font-weight:bold;'; cell = prod !== undefined ? prod.toFixed(0) : '-'; }
+            else if (idx === 14) { style += 'text-align:right;font-weight:bold;'; cell = exch !== undefined ? exch.toFixed(0) : '-'; }
+            else { style += 'text-align:right;'; }
+            row += `<td style="${style}">${cell}</td>`;
+        });
+        return row + '</tr>';
+    }
+
+    return buildRow(nxtKey, nxtEnd, '#fcf3cf', '#f39c12') + buildRow(curKey, nxtKey, '#d5f5e3', '#27ae60');
+}
+
+async function loadTranselectricaData() {
+    // Transelectrica is the Romanian TSO. Skip entirely for HU to prevent
+    // RO live data from being painted on top of HU ENTSO-E series in the
+    // SEN chart (and from overwriting `senLive` via the periodic poll).
+    if (selectedCountry !== 'RO') return;
+    try {
+        const [response, chartResponse] = await Promise.all([
+            fetch(`${SCRIPT_ROOT}/transelectrica_data`),
+            fetch(`${SCRIPT_ROOT}/transelectrica_data?hours=24`)
+        ]);
+        const data = await response.json();
+        const chartData = await chartResponse.json();
+
+        // Load ENTSO-E data — then overlay SEN live data on top
+        loadEntsoeData(selectedDate).then(() => {
+            // Re-apply SEN live data on top of ENTSO-E actuals (SEN takes priority)
+            ['wind', 'solar', 'consumption', 'production'].forEach(f => {
+                for (const [k, v] of Object.entries(senLive[f])) liveHistory[f][k] = v;
+            });
+            buildSenChart();
+            if (isLiveMode) {
+                const ph = document.getElementById('entsoeRowsPlaceholder');
+                if (ph) ph.innerHTML = formatEntsoeRows();
+            }
+        }).catch(e => console.error('ENTSO-E background load error:', e));
+
+        // Populate SEN chart live history from 24h SEN data
+        // SEN live data takes priority over ENTSO-E actuals
+        const la = { wind: {}, solar: {}, consumption: {}, production: {} };
+        const senLive = { wind: {}, solar: {}, consumption: {}, production: {} };
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (chartData.rows) {
+            chartData.rows.forEach(row => {
+                if (row.timestamp && row.timestamp.startsWith(todayStr)) {
+                    const tp = row.timestamp.split(' ');
+                    const hm = (tp.length > 1 ? tp[1] : tp[0]).substring(0, 5);
+                    const [hStr, mStr] = hm.split(':');
+                    const rm = Math.floor(parseInt(mStr) / 15) * 15;
+                    const tk = hStr + ':' + String(rm).padStart(2, '0');
+                    ['wind', 'solar', 'consumption', 'production'].forEach(f => {
+                        if (row[f] != null) {
+                            if (!la[f][tk]) la[f][tk] = { sum: 0, count: 0 };
+                            la[f][tk].sum += parseFloat(row[f]);
+                            la[f][tk].count++;
+                        }
+                    });
+                }
+            });
+            ['wind', 'solar', 'consumption', 'production'].forEach(f => {
+                for (const [k, v] of Object.entries(la[f])) senLive[f][k] = v.sum / v.count;
+            });
+        }
+        // Start with ENTSO-E actuals as base, then overlay SEN live data on top
+        liveHistory = { wind: {}, solar: {}, consumption: {}, production: {} };
+        // ENTSO-E actuals will be merged in loadEntsoeData() — SEN live overrides them
+        ['wind', 'solar', 'consumption', 'production'].forEach(f => {
+            for (const [k, v] of Object.entries(senLive[f])) liveHistory[f][k] = v;
+        });
+        buildSenChart();
+
+        const content = document.getElementById('transelectricaContent');
+        const rows = data.rows;
+        if (!rows || rows.length === 0) { content.innerHTML = '<p style="color:var(--text-muted);">No data</p>'; return; }
+
+        let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">';
+        html += '<thead><tr style="background:#f8f9fa;">';
+        transelectricaHeaders.forEach((h, idx) => {
+            html += `<th style="padding:6px 4px;text-align:${idx===0?'left':'right'};border-bottom:2px solid #dee2e6;font-size:11px;">${h.label}</th>`;
+        });
+        html += '</tr></thead>';
+        html += '<tbody id="entsoeRowsPlaceholder">' + formatEntsoeRows() + '</tbody>';
+        html += '<tr id="transelectricaLiveRow"></tr>';
+        rows.forEach((row, i) => {
+            html += formatRow(row, false).replace('background-color: #fff', `background-color:${i%2===0?'#fff':'#f8f9fa'}`);
+        });
+        html += '</table></div>';
+        content.innerHTML = html;
+        updateLiveRow();
+
+    } catch(e) { console.error('Transelectrica error:', e); }
+}
+
+async function updateLiveRow() {
+    try {
+        const r = await fetch(`${SCRIPT_ROOT}/transelectrica_live`);
+        const data = await r.json();
+        if (data.error || !data.live) return;
+        const lr = document.getElementById('transelectricaLiveRow');
+        const ts = document.getElementById('transelectricaTimestamp');
+        if (lr) { const nr = formatRow(data.live, true); lr.outerHTML = nr.replace('<tr ', '<tr id="transelectricaLiveRow" '); }
+        if (ts && data.live.timestamp) ts.textContent = `Live: ${data.live.timestamp}`;
+        updateSenChartLive(data.live);
+    } catch(e) { console.error('Live update error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ENTSO-E + SEN CHART
+// ═══════════════════════════════════════════════════════════════
+async function loadEntsoeData(date) {
+    const d = date || selectedDate;
+    const statusEl = document.getElementById('apiStatus');
+    try {
+        const r = await fetch(withCountry(`${SCRIPT_ROOT}/entsoe_generation?date=${d}`));
+        const data = await r.json();
+        if (!data.error) {
+            entsoeData = data;
+            const windPts = Object.keys(entsoeData.wind || {}).length;
+            const consPts = Object.keys(entsoeData.total_production || {}).length;
+            const actWindPts = Object.keys(entsoeData.actual_wind || {}).length;
+            const actProdPts = Object.keys(entsoeData.actual_production || {}).length;
+            console.log('ENTSO-E loaded for', d, ':', consPts, 'consumption,', windPts, 'wind,',
+                        actWindPts, 'actual wind,', actProdPts, 'actual production points');
+
+            // Merge ENTSO-E actual data into liveHistory (actual = base, SEN live = override)
+            if (isLiveMode && (actWindPts > 0 || actProdPts > 0)) {
+                const actMap = {
+                    wind: entsoeData.actual_wind || {},
+                    solar: entsoeData.actual_solar || {},
+                    consumption: entsoeData.actual_consumption || {},
+                    production: entsoeData.actual_production || {},
+                };
+                ['wind', 'solar', 'consumption', 'production'].forEach(f => {
+                    for (const [k, v] of Object.entries(actMap[f])) {
+                        // Only fill in where SEN live data is missing
+                        if (liveHistory[f][k] === undefined) {
+                            liveHistory[f][k] = v;
+                        }
+                    }
+                });
+            }
+
+            if (windPts === 0 && consPts === 0) {
+                statusEl.textContent = 'ENTSO-E: No data (API maintenance?)';
+                statusEl.style.background = '#e74c3c';
+                statusEl.style.color = 'white';
+            } else {
+                const actTotal = actWindPts + actProdPts;
+                statusEl.textContent = actTotal > 0
+                    ? `ENTSO-E: ${consPts} forecast + ${actProdPts} actual pts`
+                    : `ENTSO-E: ${consPts} pts`;
+                statusEl.style.background = '#27ae60';
+                statusEl.style.color = 'white';
+            }
+        }
+    } catch(e) {
+        console.error('ENTSO-E error:', e);
+        statusEl.textContent = 'ENTSO-E: Error';
+        statusEl.style.background = '#e74c3c';
+        statusEl.style.color = 'white';
+    }
+}
+
+function buildSenChart() {
+    const ctx = document.getElementById('senChart');
+    if (!ctx) return;
+    const isDark = document.body.classList.contains('dark-mode');
+    const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    const textColor = isDark ? '#e0e0e0' : '#666';
+
+    // Update title
+    const title = document.getElementById('senChartTitle');
+    const hasActuals = Object.keys(entsoeData.actual_wind || {}).length > 0 ||
+                       Object.keys(entsoeData.actual_production || {}).length > 0;
+    if (title) {
+        // SEN chart is RO-only (hidden for HU). Both the forecast and actual
+        // lines are Transelectrica data — they reach the dashboard via two
+        // paths but the underlying TSO is the same. So label "Transelectrica"
+        // rather than the transport, which is what the user actually cares about.
+        if (isLiveMode) {
+            title.textContent = hasActuals
+                ? 'SEN Production Chart (Transelectrica forecast + actual + live)'
+                : 'SEN Production Chart (Transelectrica forecast + live)';
+        } else {
+            title.textContent = hasActuals
+                ? `SEN Production Chart — ${selectedDate} (Transelectrica forecast + actual)`
+                : `SEN Production Chart — ${selectedDate} (Transelectrica forecast)`;
+        }
+    }
+
+    // Check data availability and show status
+    const hasEntsoe = Object.keys(entsoeData.wind || {}).length > 0 || Object.keys(entsoeData.consumption || {}).length > 0;
+    const hasLive = Object.keys(liveHistory.production || {}).length > 0;
+    const statusEl = document.getElementById('senChartStatus');
+    const overlay = document.getElementById('senChartOverlay');
+    if (statusEl) {
+        if (hasEntsoe && hasLive) {
+            statusEl.textContent = 'Transelectrica forecast + live';
+            statusEl.style.background = '#27ae60'; statusEl.style.color = 'white';
+        } else if (hasLive) {
+            statusEl.textContent = 'Live SEN only (forecast unavailable)';
+            statusEl.style.background = '#e67e22'; statusEl.style.color = 'white';
+        } else if (hasEntsoe) {
+            statusEl.textContent = 'Transelectrica forecast only';
+            statusEl.style.background = '#3498db'; statusEl.style.color = 'white';
+        } else {
+            statusEl.textContent = 'Waiting for data...';
+            statusEl.style.background = '#95a5a6'; statusEl.style.color = 'white';
+        }
+    }
+    if (overlay) {
+        if (!hasEntsoe && !hasLive) {
+            overlay.style.display = 'block';
+            overlay.innerHTML = 'Waiting for data...<br><small>ENTSO-E API may be in maintenance. Live SEN data will appear shortly.</small>';
+        } else {
+            overlay.style.display = 'none';
+        }
+    }
+
+    // 15-min labels
+    const L = [];
+    for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15)
+        L.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+
+    const eW = L.map(k => entsoeData.wind[k] ?? null);
+    const eS = L.map(k => entsoeData.solar[k] ?? null);
+    const eC = L.map(k => entsoeData.consumption[k] ?? null);       // Load = Consumption
+    const eP = L.map(k => entsoeData.total_production[k] ?? null);  // Generation = Production
+    const yC = L.map(k => (entsoeData.yesterday_consumption || {})[k] ?? null);
+    const yP = L.map(k => (entsoeData.yesterday_production || {})[k] ?? null);
+    const yW = L.map(k => (entsoeData.yesterday_wind || {})[k] ?? null);
+    const yS = L.map(k => (entsoeData.yesterday_solar || {})[k] ?? null);
+
+    const eB = L.map((k,i) => eP[i] != null ? eP[i] - (eW[i]??0) - (eS[i]??0) : null);
+    const yB = L.map((k,i) => yP[i] != null ? yP[i] - (yW[i]??0) - (yS[i]??0) : null);
+
+    // Live/Actual data — show when we have data (live SEN or ENTSO-E actuals)
+    let lW, lS, lC, lP, lB, estW, estS, estC, estP, estB;
+    const hasActualData = Object.keys(liveHistory.production || {}).length > 0 ||
+                          Object.keys(liveHistory.wind || {}).length > 0;
+
+    if (isLiveMode || hasActualData) {
+        // Show ALL data points in the DEN line (including current interval)
+        lW = L.map(k => liveHistory.wind[k] ?? null);
+        lS = L.map(k => liveHistory.solar[k] ?? null);
+        lC = L.map(k => liveHistory.consumption[k] ?? null);
+        lP = L.map(k => liveHistory.production[k] ?? null);
+        lB = L.map((k,i) => lP[i] != null ? lP[i] - (lW[i]??0) - (lS[i]??0) : null);
+
+        if (isLiveMode) {
+            // Show current interval as estimated marker too (overlays the DEN line endpoint)
+            let nowD = new Date();
+            const curM = Math.floor(nowD.getMinutes() / 15) * 15;
+            const curKey = String(nowD.getHours()).padStart(2,'0') + ':' + String(curM).padStart(2,'0');
+            const eK = new Set([curKey]);
+            estW = L.map(k => eK.has(k) ? (liveHistory.wind[k] ?? null) : null);
+            estS = L.map(k => eK.has(k) ? (liveHistory.solar[k] ?? null) : null);
+            estC = L.map(k => eK.has(k) ? (liveHistory.consumption[k] ?? null) : null);
+            estP = L.map(k => eK.has(k) ? (liveHistory.production[k] ?? null) : null);
+            estB = L.map((k,i) => estP[i] != null ? estP[i] - (estW[i]??0) - (estS[i]??0) : null);
+        } else {
+            const empty = L.map(() => null);
+            estW = estS = estC = estP = estB = empty;
+        }
+    } else {
+        const empty = L.map(() => null);
+        lW = lS = lC = lP = lB = empty;
+        estW = estS = estC = estP = estB = empty;
+    }
+
+    // SEN chart is RO-only. Both the day-ahead "forecast" lines and the
+    // live "DEN" lines come from Transelectrica — we just retrieve them
+    // through different transports. Label them by what they REPRESENT
+    // (forecast vs live actual) rather than which API was used.
+    const datasets = [
+        { label:'Wind (forecast)', data:eW, borderColor:'#2ecc71', borderWidth:2.5, tension:0.3, pointRadius:0, pointHoverRadius:4, fill:false, spanGaps:true },
+        { label:'Solar (forecast)', data:eS, borderColor:'#f1c40f', borderWidth:2.5, tension:0.3, pointRadius:0, pointHoverRadius:4, fill:false, spanGaps:true },
+        { label:'Consumption (forecast)', data:eC, borderColor:'#e74c3c', borderWidth:2.5, tension:0.3, pointRadius:0, pointHoverRadius:4, fill:false, spanGaps:true },
+        { label:'Production (forecast)', data:eP, borderColor:'#3498db', borderWidth:2.5, tension:0.3, pointRadius:0, pointHoverRadius:4, fill:false, spanGaps:true },
+        { label:'Consumption (Yesterday)', data:yC, borderColor:'#e74c3c', borderWidth:1.5, borderDash:[6,4], tension:0.3, pointRadius:0, pointHoverRadius:3, fill:false, spanGaps:true },
+        { label:'Production (Yesterday)', data:yP, borderColor:'#3498db', borderWidth:1.5, borderDash:[6,4], tension:0.3, pointRadius:0, pointHoverRadius:3, fill:false, spanGaps:true },
+        { label:'Baseload (Yesterday)', data:yB, borderColor:'#8e44ad', borderWidth:1.5, borderDash:[6,4], tension:0.3, pointRadius:0, pointHoverRadius:3, fill:false, spanGaps:true },
+        { label:'Baseload (forecast)', data:eB, borderColor:'#8e44ad', borderWidth:2.5, tension:0.3, pointRadius:0, pointHoverRadius:4, fill:false, spanGaps:true },
+        { label:'Wind (live)', data:lW, borderColor:'#82e0aa', borderWidth:1.5, pointRadius:0, tension:0.2, spanGaps:true },
+        { label:'Solar (live)', data:lS, borderColor:'#f9e154', borderWidth:1.5, pointRadius:0, tension:0.2, spanGaps:true },
+        { label:'Consumption (live)', data:lC, borderColor:'#f1948a', borderWidth:1.5, pointRadius:0, tension:0.2, spanGaps:true },
+        { label:'Production (live)', data:lP, borderColor:'#85c1e9', borderWidth:1.5, pointRadius:0, tension:0.2, spanGaps:true },
+        { label:'Baseload (live)', data:lB, borderColor:'#c39bd3', borderWidth:1.5, pointRadius:0, tension:0.2, spanGaps:true },
+        { label:'Wind (Est.)', data:estW, borderColor:'#82e0aa', borderWidth:1.5, pointRadius:2, borderDash:[4,4], tension:0.2, spanGaps:true },
+        { label:'Solar (Est.)', data:estS, borderColor:'#f9e154', borderWidth:1.5, pointRadius:2, borderDash:[4,4], tension:0.2, spanGaps:true },
+        { label:'Consumption (Est.)', data:estC, borderColor:'#f1948a', borderWidth:1.5, pointRadius:2, borderDash:[4,4], tension:0.2, spanGaps:true },
+        { label:'Production (Est.)', data:estP, borderColor:'#85c1e9', borderWidth:1.5, pointRadius:2, borderDash:[4,4], tension:0.2, spanGaps:true },
+        { label:'Baseload (Est.)', data:estB, borderColor:'#c39bd3', borderWidth:1.5, pointRadius:2, borderDash:[4,4], tension:0.2, spanGaps:true },
+    ];
+
+    if (senChart) {
+        senChart.data.labels = L;
+        datasets.forEach((ds, i) => { if (senChart.data.datasets[i]) senChart.data.datasets[i].data = ds.data; });
+        senChart.options.scales.x.ticks.color = textColor;
+        senChart.options.scales.x.grid.color = gridColor;
+        senChart.options.scales.y.ticks.color = textColor;
+        senChart.options.scales.y.grid.color = gridColor;
+        senChart.update('none');
+        return;
+    }
+
+    senChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: L, datasets },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: textColor, usePointStyle: true, pointStyle: 'line', font: { size: 11 } } },
+                tooltip: {
+                    itemSort: (a, b) => {
+                        const order = {'Wind (forecast)':0,'Wind (live)':1,'Wind (Est.)':2,
+                            'Solar (forecast)':3,'Solar (live)':4,'Solar (Est.)':5,
+                            'Consumption (forecast)':6,'Consumption (Yesterday)':7,'Consumption (live)':8,'Consumption (Est.)':9,
+                            'Production (forecast)':10,'Production (Yesterday)':11,'Production (live)':12,'Production (Est.)':13,
+                            'Baseload (forecast)':14,'Baseload (Yesterday)':15,'Baseload (live)':16,'Baseload (Est.)':17};
+                        return (order[a.dataset.label]??99) - (order[b.dataset.label]??99);
+                    },
+                    callbacks: { label: ctx => ctx.parsed.y == null ? null : ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0) + ' MW' }
+                }
+            },
+            scales: {
+                x: { ticks: { color: textColor, maxTicksLimit: 24, callback: (v, idx) => { const l = L[idx]; return l && l.endsWith(':00') ? l : ''; } }, grid: { color: gridColor } },
+                y: { ticks: { color: textColor, callback: v => v + ' MW' }, grid: { color: gridColor }, suggestedMin: 0, suggestedMax: 8000 }
+            }
+        }
+    });
+}
+
+function updateSenChartLive(liveData) {
+    if (!liveData) return;
+    const now = new Date();
+    const mins = Math.floor(now.getMinutes() / 15) * 15;
+    const tk = String(now.getHours()).padStart(2,'0') + ':' + String(mins).padStart(2,'0');
+    if (tk !== liveCurrentIntervalKey) {
+        liveCurrentAccum = { wind: {}, solar: {}, consumption: {}, production: {} };
+        liveCurrentIntervalKey = tk;
+    }
+    ['wind', 'solar', 'consumption', 'production'].forEach(f => {
+        const val = parseFloat(liveData[f]);
+        if (!isNaN(val)) {
+            if (!liveCurrentAccum[f][tk]) liveCurrentAccum[f][tk] = { sum: 0, count: 0 };
+            liveCurrentAccum[f][tk].sum += val;
+            liveCurrentAccum[f][tk].count++;
+            liveHistory[f][tk] = liveCurrentAccum[f][tk].sum / liveCurrentAccum[f][tk].count;
+        }
+    });
+    buildSenChart();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DAM PRICES
+// ═══════════════════════════════════════════════════════════════
+async function loadHuLiveGrid() {
+    // Only meaningful for Hungary.
+    const section = document.querySelector('[data-section-id="hu-live-grid"]');
+    if (!section) return;
+    if (selectedCountry !== 'HU') { section.style.display = 'none'; return; }
+    section.style.display = '';
+    const container = document.getElementById('huLiveGridContent');
+    const tsEl = document.getElementById('huLiveGridTs');
+    if (!container) return;
+
+    try {
+        const r = await fetch(`${SCRIPT_ROOT}/hu_live_grid?date=${selectedDate}`);
+        const d = await r.json();
+        if (d.error) {
+            container.innerHTML = `<p style="color:var(--danger);">MAVIR RTDW fetch failed: ${d.error}</p>`;
+            return;
+        }
+
+        const fmt = (v, dec=0) => (v == null ? '—' : Number(v).toFixed(dec));
+        const isDark = document.body.classList.contains('dark-mode');
+        const borderC = isDark ? 'var(--table-border)' : '#e4e7ec';
+
+        // KPI cards row
+        const gen = d.generation || {}, load = d.load || {}, freq = d.frequency || {}, reserves = d.reserves || {};
+        const genActual = gen.actual_gross, genPlan = gen.plan_gross;
+        const genDelta = (genActual != null && genPlan != null) ? (genActual - genPlan) : null;
+        const loadActual = load.actual_gross, loadPlan = load.plan_gross;
+        const loadDelta = (loadActual != null && loadPlan != null) ? (loadActual - loadPlan) : null;
+        const hz = freq.hz;
+        const hzDelta = hz != null ? (hz - 50) : null;
+        const aFrrMin = reserves.afrr_avail_min, aFrrMax = reserves.afrr_avail_max;
+
+        const deltaColor = (v) => v == null ? 'var(--text-muted)' : (Math.abs(v) < 20 ? 'var(--text-muted)' : (v > 0 ? 'var(--success)' : 'var(--danger)'));
+        const hzColor = hzDelta == null ? 'var(--text-muted)' : (Math.abs(hzDelta) < 0.05 ? 'var(--success)' : 'var(--warning)');
+
+        const kpi = (label, main, sub, color) => `
+          <div style="flex:1;min-width:160px;padding:10px 14px;border:1px solid ${borderC};border-radius:10px;">
+            <div style="font-size:11px;color:var(--text-muted);">${label}</div>
+            <div style="font-size:20px;font-weight:600;color:${color || 'var(--text)'};">${main}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${sub}</div>
+          </div>`;
+
+        let html = `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">`;
+        html += kpi('Generation (gross)',
+                    fmt(genActual, 0) + ' MW',
+                    genPlan != null ? `plan ${fmt(genPlan,0)}  Δ ${genDelta >= 0 ? '+':''}${fmt(genDelta,0)}` : '',
+                    deltaColor(genDelta));
+        html += kpi('System load (gross)',
+                    fmt(loadActual, 0) + ' MW',
+                    loadPlan != null ? `plan ${fmt(loadPlan,0)}  Δ ${loadDelta >= 0 ? '+':''}${fmt(loadDelta,0)}` : '',
+                    deltaColor(loadDelta));
+        html += kpi('Grid frequency',
+                    hz != null ? fmt(hz, 3) + ' Hz' : '—',
+                    hzDelta != null ? `Δ 50 Hz: ${hzDelta >= 0 ? '+':''}${fmt(hzDelta*1000, 0)} mHz` : '',
+                    hzColor);
+        html += kpi('aFRR reserve band',
+                    (aFrrMin != null && aFrrMax != null) ? `${fmt(aFrrMin,0)} – ${fmt(aFrrMax,0)} MW` : '—',
+                    '15-min available',
+                    'var(--primary)');
+        html += `</div>`;
+
+        // Fuel mix — horizontal bar of percentages
+        const fuel = d.fuel_mix || {};
+        const fuelOrder = [
+            ['nuclear',   'Nuclear',  '#6366f1'],
+            ['lignite',   'Lignite',  '#78716c'],
+            ['gas',       'Gas',      '#f59e0b'],
+            ['hard_coal', 'Coal',     '#44403c'],
+            ['oil',       'Oil',      '#292524'],
+            ['wind',      'Wind',     '#22d3ee'],
+            ['pv',        'Solar',    '#fbbf24'],
+            ['hydro_ror', 'Hydro ROR','#3b82f6'],
+            ['hydro_res', 'Hydro Res','#2563eb'],
+            ['biomass',   'Biomass',  '#16a34a'],
+            ['waste',     'Waste',    '#84cc16'],
+            ['other_renew','Other Renew','#10b981'],
+            ['other',     'Other',    '#a1a1aa'],
+        ];
+        const total = fuel.total || 0;
+        if (total > 0) {
+            html += `<div style="margin-top:6px;margin-bottom:6px;font-size:12px;font-weight:500;color:var(--text-muted);">Generation mix (latest minute, total ${fmt(total,0)} MW)</div>`;
+            html += `<div style="display:flex;width:100%;height:22px;border-radius:6px;overflow:hidden;border:1px solid ${borderC};">`;
+            fuelOrder.forEach(([k, label, col]) => {
+                const v = fuel[k] || 0;
+                if (v > 0) {
+                    const pct = (v / total * 100);
+                    html += `<div title="${label}: ${v.toFixed(1)} MW (${pct.toFixed(1)}%)" style="background:${col};width:${pct}%;"></div>`;
+                }
+            });
+            html += `</div>`;
+            html += `<div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:8px;font-size:11px;">`;
+            fuelOrder.forEach(([k, label, col]) => {
+                const v = fuel[k] || 0;
+                if (v > 0) {
+                    const pct = (v / total * 100);
+                    html += `<span><span style="display:inline-block;width:10px;height:10px;background:${col};border-radius:2px;margin-right:4px;vertical-align:middle;"></span>${label} <b>${v.toFixed(0)}</b> MW (${pct.toFixed(1)}%)</span>`;
+                }
+            });
+            html += `</div>`;
+        }
+
+        // Balancing activations — last 15-min row
+        const bal = d.balancing || {};
+        if (bal.timestamp) {
+            html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid ${borderC};">`;
+            html += `<div style="font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:6px;">Balancing activations (last 15-min, ${bal.timestamp})</div>`;
+            html += `<div style="display:flex;flex-wrap:wrap;gap:18px;font-size:12px;">`;
+            const balRow = (label, up, dn) => `
+              <div>
+                <span style="color:var(--text-muted);">${label}:</span>
+                <span style="color:var(--success);font-weight:500;">▲ ${up != null ? fmt(up, 1) : '—'}</span>
+                <span style="color:var(--danger);font-weight:500;margin-left:6px;">▼ ${dn != null ? fmt(dn, 1) : '—'}</span>
+              </div>`;
+            html += balRow('aFRR (total)', bal.afrr_up, bal.afrr_down);
+            html += balRow('aFRR (domestic)', bal.afrr_hu_up, bal.afrr_hu_down);
+            html += balRow('IGCC', bal.igcc_up, bal.igcc_down);
+            html += balRow('Manual (mFRR)', bal.mfrr_up, bal.mfrr_down);
+            const nb = d.nonbalancing || {};
+            if (nb.timestamp) {
+                html += balRow('Non-balancing (redispatch)', nb.nonbal_up, nb.nonbal_down);
+            }
+            html += `</div></div>`;
+        }
+
+        // Renewable share + CO2 — bonus HU-specific metrics from RTDW
+        const rs = d.renew_share || {}, co2 = d.co2 || {};
+        if (rs.renew_share != null || co2.co2_actual != null) {
+            html += `<div style="margin-top:12px;padding-top:10px;border-top:1px solid ${borderC};display:flex;flex-wrap:wrap;gap:18px;font-size:12px;">`;
+            if (rs.renew_share != null) {
+                html += `<div><span style="color:var(--text-muted);">Renewable share:</span> <b style="color:var(--success);">${fmt(rs.renew_share, 1)}%</b></div>`;
+            }
+            if (co2.co2_actual != null) {
+                html += `<div><span style="color:var(--text-muted);">CO₂ emissions:</span> <b>${fmt(co2.co2_actual, 0)}</b> t/h</div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Time-series production/load chart (minute resolution) — the HU
+        // equivalent of Romania's SEN chart, sourced entirely from MAVIR RTDW.
+        html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid ${borderC};">
+            <div style="font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:6px;">
+                Production &amp; Load — today (MAVIR RTDW, minute resolution)
+            </div>
+            <div style="position:relative;min-height:280px;">
+                <canvas id="huProductionChart" height="280"></canvas>
+            </div>
+        </div>`;
+
+        container.innerHTML = html;
+        drawHuProductionChart(d.series || {});
+        if (tsEl) tsEl.textContent = d.timestamp ? `updated ${d.timestamp} · MAVIR RTDW` : 'MAVIR RTDW';
+    } catch (e) {
+        container.innerHTML = `<p style="color:var(--danger);">Live grid fetch failed: ${e.message || e}</p>`;
+    }
+}
+
+let huProductionChart = null;
+function drawHuProductionChart(series) {
+    const canvas = document.getElementById('huProductionChart');
+    if (!canvas) return;
+    const isDark = document.body.classList.contains('dark-mode');
+    const textColor = isDark ? 'rgba(255,255,255,0.85)' : '#333';
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+
+    // Minute-resolution keys look like "2026-04-23 14:30:00". Build a sorted
+    // union of all timestamps across every series so all lines share one axis.
+    const allTs = new Set();
+    ['generation_actual','generation_plan','load_actual','load_plan','wind','pv'].forEach(k => {
+        Object.keys(series[k] || {}).forEach(t => allTs.add(t));
+    });
+    const labels = Array.from(allTs).sort();
+    const pick = (k) => labels.map(t => (series[k] && series[k][t] != null) ? series[k][t] : null);
+
+    const ds = [
+        { label: 'Load (actual)',        data: pick('load_actual'),       borderColor: '#ef4444', borderWidth: 2,   pointRadius: 0, tension: 0.2, spanGaps: true },
+        { label: 'Load (plan)',          data: pick('load_plan'),         borderColor: '#fca5a5', borderWidth: 1.2, pointRadius: 0, tension: 0.2, spanGaps: true, borderDash: [4,3] },
+        { label: 'Generation (actual)',  data: pick('generation_actual'), borderColor: '#3b82f6', borderWidth: 2,   pointRadius: 0, tension: 0.2, spanGaps: true },
+        { label: 'Generation (plan)',    data: pick('generation_plan'),   borderColor: '#93c5fd', borderWidth: 1.2, pointRadius: 0, tension: 0.2, spanGaps: true, borderDash: [4,3] },
+        { label: 'Wind',                 data: pick('wind'),              borderColor: '#22d3ee', borderWidth: 1.5, pointRadius: 0, tension: 0.2, spanGaps: true },
+        { label: 'Solar',                data: pick('pv'),                borderColor: '#fbbf24', borderWidth: 1.5, pointRadius: 0, tension: 0.2, spanGaps: true },
+    ];
+
+    // HH:MM labels (minute-level data is noisy; let Chart.js thin them).
+    const xLabels = labels.map(t => (t && t.length >= 16) ? t.slice(11, 16) : t);
+
+    if (huProductionChart) {
+        huProductionChart.data.labels = xLabels;
+        ds.forEach((d, i) => { if (huProductionChart.data.datasets[i]) huProductionChart.data.datasets[i].data = d.data; });
+        huProductionChart.update('none');
+        return;
+    }
+    huProductionChart = new Chart(canvas, {
+        type: 'line',
+        data: { labels: xLabels, datasets: ds },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+                tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y != null ? Math.round(c.parsed.y) : '—'} MW` } },
+            },
+            scales: {
+                x: { ticks: { color: textColor, maxTicksLimit: 12, autoSkip: true }, grid: { color: gridColor } },
+                y: { ticks: { color: textColor, callback: (v) => v + ' MW' }, grid: { color: gridColor } },
+            },
+        },
+    });
+}
+
+async function loadDamPrices() {
+    const date = document.getElementById('damDate').value || new Date().toISOString().split('T')[0];
+    try {
+        const r = await fetch(withCountry(`${SCRIPT_ROOT}/dam_prices?date=${date}`));
+        const data = await r.json();
+        const prices = data.prices || {};
+
+        const hours = [];
+        const vals = [];
+        for (let h = 0; h < 24; h++) {
+            const k = String(h).padStart(2,'0') + ':00';
+            hours.push(h + ':00');
+            vals.push(prices[k] ?? null);
+        }
+
+        const valid = vals.filter(v => v != null);
+        const avg = valid.length ? valid.reduce((s,v)=>s+v,0)/valid.length : 0;
+        const min = valid.length ? Math.min(...valid) : 0;
+        const max = valid.length ? Math.max(...valid) : 0;
+
+        if (damChart) damChart.destroy();
+        damChart = new Chart(document.getElementById('damChart'), {
+            type: 'bar',
+            data: {
+                labels: hours,
+                datasets: [{ label: 'EUR/MWh', data: vals,
+                    backgroundColor: vals.map(v => v > avg*1.3 ? '#e74c3c' : v < avg*0.7 ? '#27ae60' : '#3498db'),
+                    borderRadius: 3 }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: document.body.classList.contains('dark-mode') ? '#aaa' : '#666' } },
+                    y: { grid: { color: document.body.classList.contains('dark-mode') ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
+                         ticks: { color: document.body.classList.contains('dark-mode') ? '#aaa' : '#666' } }
+                }
+            }
+        });
+
+        document.getElementById('damStats').innerHTML = valid.length ?
+            `Avg: <b>${avg.toFixed(2)}</b> | Min: <b>${min.toFixed(2)}</b> (${hours[vals.indexOf(min)]}) | Max: <b>${max.toFixed(2)}</b> (${hours[vals.indexOf(max)]}) EUR/MWh` :
+            'No price data available';
+
+    } catch(e) { console.error('DAM error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HISTORY / LIVE MODE
+// ═══════════════════════════════════════════════════════════════
+function updateModeIndicator() {
+    const ind = document.getElementById('modeIndicator');
+    if (isLiveMode) {
+        ind.textContent = 'LIVE';
+        ind.style.background = '#27ae60';
+        ind.style.color = 'white';
+    } else {
+        ind.textContent = 'HISTORICAL: ' + selectedDate;
+        ind.style.background = '#e67e22';
+        ind.style.color = 'white';
+    }
+}
+
+function startLiveUpdates() {
+    stopLiveUpdates();
+    // Stagger start offsets so updates don't pile onto the same animation frame
+    const stagger = (fn, interval, offset) => {
+        const to = setTimeout(() => {
+            fn();
+            liveIntervals.push(setInterval(fn, interval));
+        }, offset);
+        liveIntervals.push(to);
+    };
+    stagger(loadMeritOrderData,    15000,  0);
+    stagger(updateLiveRow,         15000,  3000);
+    stagger(loadPrediction,        15000,  6000);
+    stagger(loadTranselectricaData, 30000, 9000);
+    stagger(loadMarketAnalysis,    30000, 12000);
+    stagger(() => loadEntsoeData(selectedDate).then(() => buildSenChart()), 60000, 20000);
+}
+
+function stopLiveUpdates() {
+    liveIntervals.forEach(id => { clearInterval(id); clearTimeout(id); });
+    liveIntervals = [];
+}
+
+async function loadHistoricalDate() {
+    const date = document.getElementById('globalDate').value;
+    if (!date) return;
+    selectedDate = date;
+    const today = new Date().toISOString().split('T')[0];
+    isLiveMode = (date === today);
+    updateModeIndicator();
+    applyCountryVisibility();  // hide live-only suggestion cards on historical dates
+
+    document.getElementById('loadDateBtn').disabled = true;
+    document.getElementById('loadDateBtn').textContent = 'Loading...';
+
+    if (isLiveMode && selectedCountry === 'RO') {
+        // Switch back to live mode (RO-only polling)
+        startLiveUpdates();
+        loadTranselectricaData();
+    } else {
+        // Historical mode OR non-RO country — stop live updates,
+        // populate live lines from ENTSO-E actuals where available.
+        stopLiveUpdates();
+        liveHistory = { wind: {}, solar: {}, consumption: {}, production: {} };
+        liveCurrentAccum = { wind: {}, solar: {}, consumption: {}, production: {} };
+    }
+
+    // Load all data for selected date. Merit Order works for both countries.
+    const tasks = [];
+    tasks.push(loadMeritOrderData());
+    tasks.push(loadEntsoeData(date).then(() => {
+            // For historical dates, populate Live lines from ENTSO-E actual data
+            if (!isLiveMode) {
+                const actMap = {
+                    wind: entsoeData.actual_wind || {},
+                    solar: entsoeData.actual_solar || {},
+                    consumption: entsoeData.actual_consumption || {},
+                    production: entsoeData.actual_production || {},
+                };
+                ['wind', 'solar', 'consumption', 'production'].forEach(f => {
+                    for (const [k, v] of Object.entries(actMap[f])) {
+                        liveHistory[f][k] = v;
+                    }
+                });
+            }
+            buildSenChart();
+        }));
+    await Promise.all(tasks);
+
+    // Sync DAM date
+    document.getElementById('damDate').value = date;
+    await loadDamPrices();
+
+    document.getElementById('loadDateBtn').disabled = false;
+    document.getElementById('loadDateBtn').textContent = 'Load';
+}
+
+function goToToday() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('globalDate').value = today;
+    selectedDate = today;
+    isLiveMode = true;
+    updateModeIndicator();
+    applyCountryVisibility();  // re-show suggestion cards when back on today
+
+    if (selectedCountry === 'RO') {
+        startLiveUpdates();
+        loadTranselectricaData();
+    }
+    loadMeritOrderData();  // works for both countries
+    loadEntsoeData(today).then(() => buildSenChart());
+    document.getElementById('damDate').value = today;
+    loadDamPrices();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MARKET STATUS
+// ═══════════════════════════════════════════════════════════════
+async function loadMarketAnalysis() {
+    try {
+        const resp = await fetch(`${SCRIPT_ROOT}/api/market_suggestion`);
+        const sug = await resp.json();
+        renderMarketStatus(sug);
+    } catch(e) { console.error('Market status error:', e); }
+}
+
+function renderMarketStatus(sug) {
+    const container = document.getElementById('marketStatusContent');
+    const tsEl = document.getElementById('maTimestamp');
+    if (!sug || sug.error || !sug.current) {
+        container.innerHTML = '<span style="color:var(--text-muted);">Waiting for live data...</span>';
+        return;
+    }
+
+    if (sug.timestamp) {
+        const m = sug.timestamp.match(/T(\d{2}:\d{2})/);
+        tsEl.textContent = m ? 'Updated ' + m[1] : '';
+    }
+
+    const c = sug.current;
+    const price = c.neg_price;
+    const imb = c.system_imbalance;
+    const isNeg = price != null && price < 0;
+    const isSurplus = imb != null && imb > 0;
+
+    // Colour + one-line status by actual price / imbalance — data only, no advice.
+    let statusText, statusColor, statusBg;
+    if (isNeg) {
+        statusColor = '#e74c3c';
+        statusBg = 'rgba(231,76,60,0.1)';
+        statusText = `Prices are NEGATIVE (${price.toFixed(2)} EUR)`;
+    } else if (isSurplus && imb > 100) {
+        statusColor = '#e67e22';
+        statusBg = 'rgba(230,126,34,0.08)';
+        statusText = `Prices positive (${price != null ? price.toFixed(2) : '?'} EUR) but system has surplus`;
+    } else if (isSurplus && imb > 0) {
+        statusColor = '#f39c12';
+        statusBg = 'rgba(243,156,18,0.06)';
+        statusText = `Prices positive (${price != null ? price.toFixed(2) : '?'} EUR), small surplus`;
+    } else {
+        statusColor = '#27ae60';
+        statusBg = 'rgba(39,174,96,0.08)';
+        statusText = `Prices positive (${price != null ? price.toFixed(2) : '?'} EUR)`;
+    }
+
+    let html = `<div style="padding:12px 16px;border-radius:8px;background:${statusBg};border:2px solid ${statusColor};">
+        <div style="font-size:16px;font-weight:bold;color:${statusColor};">${statusText}</div>
+    </div>`;
+
+    // Live numbers
+    html += `<div style="display:flex;gap:20px;margin-top:10px;font-size:13px;">
+        <span>Imbalance Price: <b style="color:${isNeg ? '#e74c3c' : '#27ae60'};">${price != null ? price.toFixed(2) + ' EUR' : '-'}</b></span>
+        <span>System Imbalance: <b style="color:${isSurplus ? '#e74c3c' : '#27ae60'};">${imb != null ? (imb > 0 ? '+' : '') + imb.toFixed(0) + ' MW' : '-'}</b>
+            ${imb != null ? `<span style="font-size:11px;color:var(--text-muted);"> (${imb > 0 ? 'too much production' : 'not enough production'})</span>` : ''}</span>
+        <span>Consumption: <b>${c.realized_consumption != null ? c.realized_consumption.toFixed(0) + ' MW' : '-'}</b></span>
+    </div>`;
+
+    container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PRICE DIRECTION FORECAST
+// ═══════════════════════════════════════════════════════════════
+let lastAlertTime = 0;
+let predNotifPermission = false;
+let latestPredData = null;
+
+// Request notification permission
+if ('Notification' in window) {
+    if (Notification.permission === 'granted') predNotifPermission = true;
+    else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => { predNotifPermission = (p === 'granted'); });
+    }
+}
+
+function playAlertSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 800; gain.gain.value = 0.3;
+        osc.start();
+        setTimeout(() => { gain.gain.value = 0; }, 200);
+        setTimeout(() => { gain.gain.value = 0.3; }, 400);
+        setTimeout(() => { gain.gain.value = 0; }, 600);
+        setTimeout(() => { gain.gain.value = 0.3; }, 800);
+        setTimeout(() => { gain.gain.value = 0; osc.stop(); ctx.close(); }, 1000);
+    } catch(e) {}
+}
+
+async function loadPrediction() {
+    try {
+        const resp = await fetch(`${SCRIPT_ROOT}/api/prediction`);
+        const pred = await resp.json();
+        latestPredData = pred;
+        renderPrediction(pred);
+    } catch(e) { console.error('Prediction fetch error:', e); }
+}
+
+function renderPrediction(pred) {
+    const statusEl = document.getElementById('predModelStatus');
+    const priceEl = document.getElementById('predCurrentPrice');
+    const bannerEl = document.getElementById('predAlertBanner');
+    const tableEl = document.getElementById('predForecastTable');
+    const senEl = document.getElementById('senGridStatus');
+
+    if (!pred.model_ready) {
+        statusEl.textContent = pred.training_in_progress
+            ? `Training... (${pred.historical_days_loaded || 0} days)`
+            : 'Collecting data...';
+        statusEl.style.background = '#f39c12';
+        senEl.style.display = 'none';
+        return;
+    }
+
+    const quarters = pred.quarters || [];
+    if (!quarters.length) {
+        statusEl.textContent = 'Waiting for data...';
+        statusEl.style.background = '#3498db';
+        senEl.style.display = 'none';
+        return;
+    }
+
+    // Model status badge
+    const hasLR = pred.logreg_ready && pred.logreg_probability != null;
+    const hasRF = pred.rf_ready;
+    const hasProphet = pred.prophet_ready;
+    const hasLSTM = pred.lstm_ready;
+    const modelCount = 1 + (hasLR ? 1 : 0) + (hasRF ? 1 : 0) + (hasProphet ? 1 : 0) + (hasLSTM ? 1 : 0);
+    const lagISPs = pred.damas_lag || 0;
+    if (lagISPs > 4) {
+        statusEl.textContent = `Live (data ${lagISPs * 15}min behind)`;
+        statusEl.style.background = '#e67e22';
+    } else {
+        statusEl.textContent = modelCount > 1 ? `Live (${modelCount} models)` : 'Live';
+        statusEl.style.background = '#27ae60';
+    }
+
+    // Current price — show with DAMAS lag note if stale
+    const cp = pred.current_price;
+    if (cp != null) {
+        let priceText = cp.toFixed(2) + ' EUR/MWh';
+        if (lagISPs >= 2) priceText += ` (${lagISPs * 15}min ago)`;
+        priceEl.textContent = priceText;
+        priceEl.style.color = cp < 0 ? '#e74c3c' : '#27ae60';
+    }
+
+    // ── SEN Grid Status bar (above the forecast table) ──
+    if (hasLR && pred.sen_solar != null) {
+        const solar = Math.round(pred.sen_solar || 0);
+        const wind = Math.round(pred.sen_wind || 0);
+        const cons = Math.round(pred.sen_consumption || 0);
+        const prod = Math.round(pred.sen_production || 0);
+        const exch = pred.sen_exchange || 0;
+        const surplus = prod - cons;
+
+        // Color logic for the overall grid state
+        const solarHigh = solar > 1500;
+        const exporting = exch < -500;
+        const surplusHigh = surplus > 500;
+        let gridBorder = 'var(--border)';
+        let gridBg = 'transparent';
+        if (solarHigh && exporting) { gridBorder = 'rgba(231,76,60,0.5)'; gridBg = 'rgba(231,76,60,0.05)'; }
+        else if (solarHigh || surplusHigh) { gridBorder = 'rgba(243,156,18,0.5)'; gridBg = 'rgba(243,156,18,0.04)'; }
+
+        const lrNeg = Math.round(pred.logreg_probability * 100);
+        const lrPos = 100 - lrNeg;
+        const lrColor = lrNeg >= 50 ? '#e74c3c' : '#27ae60';
+        const lrLabel = lrNeg >= 50 ? `${lrNeg}% negative` : `${lrPos}% positive`;
+
+        const exchLabel = exch < 0
+            ? `<span style="color:#e74c3c;">Export ${Math.round(Math.abs(exch))}</span>`
+            : `<span style="color:#27ae60;">Import ${Math.round(exch)}</span>`;
+        const surplusColor = surplus > 0 ? '#e67e22' : '#27ae60';
+
+        senEl.style.display = 'block';
+        senEl.style.border = `1px solid ${gridBorder}`;
+        senEl.style.background = gridBg;
+        senEl.style.padding = '7px 12px';
+        senEl.style.fontSize = '11px';
+        senEl.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+                    <span title="Solar generation">Solar <b>${solar}</b> MW</span>
+                    <span title="Wind generation">Wind <b>${wind}</b> MW</span>
+                    <span title="Total production">Prod <b>${prod}</b></span>
+                    <span title="Total consumption">Cons <b>${cons}</b></span>
+                    <span title="Production minus consumption" style="color:${surplusColor};font-weight:bold;">${surplus > 0 ? '+' : ''}${Math.round(surplus)} MW</span>
+                    <span title="Cross-border exchange">${exchLabel} MW</span>
+                </div>
+                <div style="font-weight:bold;color:${lrColor};font-size:12px;" title="Combined DAMAS+SEN model prediction">
+                    Model ${lrLabel}
+                </div>
+            </div>`;
+    } else {
+        senEl.style.display = 'none';
+    }
+
+    // ── Build direction forecast rows ──
+    let html = '';
+    html += `<div style="display:grid;grid-template-columns:52px 1fr 46px;gap:8px;font-size:10px;font-weight:bold;color:var(--text-muted);padding:0 8px 3px 8px;">
+        <span>Interval</span><span></span><span style="text-align:right;color:#e74c3c;">Neg</span>
+    </div>`;
+
+    quarters.forEach(q => {
+        // Use ensemble probability when available, otherwise XGBoost alone
+        const mainProb = q.ensemble_probability != null ? q.ensemble_probability : q.probability;
+        const negPct = Math.round(mainProb * 100);
+        const posPct = 100 - negPct;
+
+        // Horizon + per-model breakdown kept on hover only, to keep rows minimal
+        const xgbNeg = Math.round(q.probability * 100);
+        const lstmNeg = q.lstm_probability != null ? Math.round(q.lstm_probability * 100) : null;
+        let modelDetail = `${q.horizon_label} ahead · XGB ${xgbNeg}%`;
+        if (lstmNeg != null) modelDetail += ` · LSTM ${lstmNeg}%`;
+
+        // Subtle row tint + numeral colour scale by negative risk
+        let rowBg = 'transparent';
+        let numColor = 'var(--text-muted)';
+        let warn = '';
+        if (negPct >= 60) { rowBg = 'rgba(231,76,60,0.1)'; numColor = '#e74c3c'; warn = ' &#9888;'; }
+        else if (negPct >= 40) { rowBg = 'rgba(243,156,18,0.06)'; numColor = '#e67e22'; }
+
+        html += `<div style="display:grid;grid-template-columns:52px 1fr 46px;gap:8px;align-items:center;padding:5px 8px;border-radius:5px;background:${rowBg};" title="${modelDetail}">
+            <div style="font-size:12px;font-weight:600;">${q.target_time}</div>
+            <div style="display:flex;height:10px;border-radius:3px;overflow:hidden;background:rgba(127,127,127,0.12);">
+                <div style="width:${posPct}%;background:#27ae60;transition:width 0.5s;"></div>
+                <div style="width:${negPct}%;background:#e74c3c;transition:width 0.5s;"></div>
+            </div>
+            <div style="text-align:right;font-weight:bold;font-size:13px;color:${numColor};white-space:nowrap;">${negPct}%${warn}</div>
+        </div>`;
+    });
+
+    tableEl.innerHTML = html;
+
+    // ── Alert banner ──
+    // Use ensemble probability for alerts (combines all available models)
+    const worstQ = quarters.reduce((a, b) => {
+        const bProb = b.ensemble_probability != null ? b.ensemble_probability : b.probability;
+        const aProb = a.ensemble_probability != null ? a.ensemble_probability : a.probability;
+        return bProb > aProb ? b : a;
+    }, quarters[0]);
+    const worstNeg = Math.round((worstQ.ensemble_probability != null ? worstQ.ensemble_probability : worstQ.probability) * 100);
+    const lrNegPct = hasLR ? Math.round(pred.logreg_probability * 100) : 0;
+    const alertLevel = Math.max(worstNeg, lrNegPct);
+
+    if (alertLevel >= 50) {
+        const isCritical = alertLevel >= 70;
+        const color = isCritical ? '#e74c3c' : '#e67e22';
+        const bgColor = isCritical ? 'rgba(231,76,60,0.15)' : 'rgba(230,126,34,0.12)';
+        const reasons = [];
+        const alertQs = quarters.filter(q => {
+            const p = q.ensemble_probability != null ? q.ensemble_probability : q.probability;
+            return Math.round(p * 100) >= 50;
+        });
+        if (alertQs.length) {
+            reasons.push(alertQs.map(q => {
+                const p = q.ensemble_probability != null ? q.ensemble_probability : q.probability;
+                return `${q.target_time} (${Math.round(p*100)}% neg)`;
+            }).join(', '));
+        }
+        if (lrNegPct >= 50) {
+            reasons.push(`Grid model: ${lrNegPct}% negative`);
+        }
+
+        bannerEl.style.display = 'block';
+        bannerEl.style.background = bgColor;
+        bannerEl.style.color = color;
+        bannerEl.style.border = `2px solid ${color}`;
+        bannerEl.innerHTML = `&#9888; ${reasons.join(' | ')}`;
+        bannerEl.style.animation = isCritical ? 'pulse 1s ease-in-out infinite' : 'none';
+    } else {
+        bannerEl.style.display = 'none';
+    }
+
+    // ── Notifications ──
+    if (alertLevel >= 50 && isLiveMode) {
+        const now = Date.now();
+        if (now - lastAlertTime > 300000) {
+            lastAlertTime = now;
+            playAlertSound();
+            if (predNotifPermission) {
+                try {
+                    const alertQs = quarters.filter(q => Math.round(q.probability * 100) >= 50);
+                    let body = alertQs.map(q => `${q.target_time}: ${Math.round(q.probability*100)}% negative`).join('\n');
+                    if (lrNegPct >= 50) body += `\nGrid model: ${lrNegPct}% negative`;
+                    new Notification('NEGATIVE PRICE WARNING', {
+                        body: body + `\nCurrent: ${cp != null ? cp.toFixed(2) : '?'} EUR/MWh`,
+                        requireInteraction: true, tag: 'neg-price-alert'
+                    });
+                } catch(e) {}
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+const todayStr = new Date().toISOString().split('T')[0];
+document.getElementById('globalDate').value = todayStr;
+document.getElementById('damDate').value = todayStr;
+selectedDate = todayStr;
+isLiveMode = true;
+updateModeIndicator();
+
+// Restore the last-selected country and set up panel visibility accordingly.
+const countrySel = document.getElementById('countrySel');
+if (countrySel) countrySel.value = selectedCountry;
+applyCountryVisibility();
+refreshFxBadge();  // update FX pill with real ECB rate (async, cached 1h)
+
+window.scrollTo(0, 0);
+
+initDragAndDrop();
+// Merit Order works for both countries now (RO=DAMAS, HU=MAVIR).
+loadMeritOrderData();
+// RO-only features.
+if (selectedCountry === 'RO') {
+    loadTranselectricaData();
+    loadPrediction();
+    loadMarketAnalysis();
+}
+loadDamPrices();  // works for both RO and HU via ENTSO-E
+loadHuLiveGrid();  // HU-only — function self-guards on country
+
+if (selectedCountry === 'RO') {
+    startLiveUpdates();  // polling loop drives loadEntsoeData at t+20s
+} else {
+    // HU: no live loop, so fetch ENTSO-E generation data once on load
+    loadEntsoeData(selectedDate).then(() => buildSenChart()).catch(() => {});
+}
+</script>
+</body>
+</html>

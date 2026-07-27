@@ -1,0 +1,11 @@
+flask==3.1.2
+requests==2.32.3
+pandas==2.3.3
+numpy==2.2.6
+scikit-learn==1.7.2
+lxml==6.0.2
+apscheduler==3.11.2
+xgboost==3.2.0
+# torch is installed separately (CPU wheel) in the Dockerfile.
+# prophet is an optional lazy import (a minor secondary forecast); omitted to keep
+# the image light — the XGBoost + LSTM + RF + logreg ensemble runs without it.

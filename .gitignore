@@ -1,0 +1,21 @@
+# Databases (regenerable from scrapers)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+
+# Secrets
+.env
+local_config.py
+
+# Windows
+desktop.ini

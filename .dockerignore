@@ -1,0 +1,13 @@
+*.db
+*.sqlite
+*.sqlite3
+*.log
+__pycache__/
+*.pyc
+.git/
+.gitignore
+venv/
+.venv/
+env/
+local_config.py
+_mavir_test/

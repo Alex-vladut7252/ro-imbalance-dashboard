@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forecast Hub — Hungary wind & solar (multi-source)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c222c;
+    --border: #2a3142;
+    --border-strong: #3a4458;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #6e7681;
+    --accent: #58a6ff;
+    --success: #3fb950;
+    --danger: #f85149;
+    --warn: #d29922;
+    --c-day-ahead: #58a6ff;
+    --c-intraday:  #d29922;
+    --c-current:   #a371f7;
+    --c-actual:    #3fb950;
+    --c-mavir:     #f29a4a;
+    --c-meteo:     #ff7b72;
+  }
+  body.light {
+    --bg: #f6f8fa;
+    --panel: #ffffff;
+    --panel-2: #f0f3f9;
+    --border: #d0d7de;
+    --border-strong: #afb8c1;
+    --text: #1f2328;
+    --text-muted: #57606a;
+    --text-dim: #818b98;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; line-height: 1.5;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 14px 22px; display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px;
+  }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  header h1 .sub { color: var(--text-muted); font-weight: 400; font-size: 12px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .header-actions a, .header-actions button {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    text-decoration: none; font-size: 12px; padding: 6px 12px; border-radius: 6px;
+    cursor: pointer; font-family: inherit;
+  }
+  .header-actions a:hover, .header-actions button:hover { border-color: var(--accent); }
+  main { padding: 18px 22px 60px; max-width: 1500px; margin: 0 auto; }
+
+  .controls {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 16px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; align-items: end;
+  }
+  .ctl { display: flex; flex-direction: column; gap: 4px; }
+  .ctl label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+    color: var(--text-muted); font-weight: 600;
+  }
+  .ctl input, .ctl button {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 6px; font-family: inherit; font-size: 13px; width: 100%;
+  }
+  .ctl button { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
+  .ctl .quick { display: flex; gap: 4px; padding: 0; }
+  .ctl .quick button {
+    flex: 1; background: var(--panel-2); color: var(--text-muted);
+    border: 1px solid var(--border); font-size: 11px; padding: 7px 4px; font-weight: 500;
+  }
+  .ctl .quick button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .source-bar {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .source-bar > .label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .6px;
+    font-weight: 600; margin-right: 4px;
+  }
+  .src-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
+    border-radius: 14px; font-size: 12px; cursor: pointer; user-select: none;
+    border: 1.5px solid var(--border); background: var(--panel-2); color: var(--text-muted);
+    font-weight: 500;
+  }
+  .src-chip:hover { border-color: var(--border-strong); }
+  .src-chip.active { background: var(--text); color: var(--panel); border-color: var(--text); }
+  .src-chip .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .src-chip.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 1024px) { .grid-2 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card .meta {
+    color: var(--text-muted); font-size: 11px; margin-bottom: 12px;
+    display: flex; flex-wrap: wrap; gap: 4px 12px;
+  }
+  .meta b { color: var(--text); font-weight: 600; }
+  .chart-wrap { position: relative; height: 340px; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  .stat {
+    background: var(--panel-2); padding: 8px 10px; border-radius: 6px;
+    border-left: 3px solid var(--border);
+  }
+  .stat.day-ahead { border-left-color: var(--c-day-ahead); }
+  .stat.intraday  { border-left-color: var(--c-intraday); }
+  .stat.current   { border-left-color: var(--c-current); }
+  .stat.actual    { border-left-color: var(--c-actual); }
+  .stat.mavir     { border-left-color: var(--c-mavir); }
+  .stat.meteo     { border-left-color: var(--c-meteo); }
+  .stat .label { color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+  .stat .val { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .stat .sub { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+
+  .provenance {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 16px;
+  }
+  .provenance h3 { margin: 0 0 10px 0; font-size: 13px; }
+  .prov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .prov-item {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-size: 12px;
+  }
+  .prov-item .src { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .prov-item .det { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
+  .prov-item .ok { color: var(--success); }
+  .prov-item .miss { color: var(--text-dim); }
+  .prov-item a { color: var(--accent); text-decoration: none; font-size: 11px; }
+  .prov-item a:hover { text-decoration: underline; }
+
+  details.raw-data {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 16px;
+  }
+  details.raw-data summary {
+    cursor: pointer; font-size: 13px; font-weight: 600; list-style: none; outline: none;
+  }
+  details.raw-data summary::-webkit-details-marker { display: none; }
+  details.raw-data summary::before {
+    content: '▶'; color: var(--text-muted); font-size: 10px;
+    margin-right: 8px; transition: transform .15s; display: inline-block;
+  }
+  details.raw-data[open] summary::before { transform: rotate(90deg); }
+  .raw-table-wrap {
+    overflow-x: auto; max-height: 420px; overflow-y: auto;
+    margin-top: 12px; border: 1px solid var(--border); border-radius: 6px;
+  }
+  table.raw {
+    width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  table.raw th, table.raw td {
+    padding: 5px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  table.raw th {
+    position: sticky; top: 0; background: var(--panel-2); color: var(--text-muted);
+    font-weight: 600; text-transform: uppercase; letter-spacing: .4px; font-size: 10px; text-align: right;
+  }
+  table.raw th:first-child, table.raw td:first-child { text-align: left; }
+  table.raw th a {
+    color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  }
+  table.raw th a:hover { color: var(--accent); }
+  table.raw th a::after {
+    content: '↗'; font-size: 9px; color: var(--text-dim);
+  }
+  table.raw th a:hover::after { color: var(--accent); }
+  table.raw th .swatch {
+    width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px;
+    vertical-align: middle;
+  }
+  table.raw td.null { color: var(--text-dim); }
+  table.raw tr:hover td { background: var(--panel-2); }
+
+  .banner {
+    background: var(--panel); border-left: 3px solid var(--accent); border-radius: 6px;
+    padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: var(--text-muted);
+  }
+  .banner b { color: var(--text); }
+
+  .glossary {
+    margin-top: 18px; padding: 14px 16px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text-muted);
+  }
+  .glossary h3 { margin: 0 0 8px 0; font-size: 13px; color: var(--text); }
+  .glossary ul { margin: 0; padding-left: 18px; }
+  .glossary li { margin: 4px 0; }
+  .glossary a { color: var(--accent); text-decoration: none; }
+  .glossary a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Forecast Hub <span class="sub">🇭🇺 Hungary · multi-source wind & solar</span></h1>
+  <div class="header-actions">
+    <a href="/">← Main dashboard</a>
+    <button onclick="toggleTheme()">☾ Theme</button>
+  </div>
+</header>
+
+<main>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="countryPicker">Country</label>
+    <select id="countryPicker"></select>
+  </div>
+  <div class="ctl">
+    <label for="datePicker">Date</label>
+    <input type="date" id="datePicker">
+  </div>
+  <div class="ctl">
+    <label>Quick date</label>
+    <div class="quick">
+      <button data-d="-1">Yesterday</button>
+      <button data-d="0" class="active">Today</button>
+      <button data-d="1">Tomorrow</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>&nbsp;</label>
+    <button onclick="reload()">↻ Refresh</button>
+  </div>
+</div>
+
+<details style="margin: 12px 0;">
+  <summary style="cursor:pointer; color:var(--text-muted); font-size:13px;">Advanced — extra sources &amp; provenance</summary>
+  <div class="source-bar" id="sourceBar" style="margin-top:10px;">
+    <span class="label">Show on chart:</span>
+    <span class="src-chip active" data-src="DAY_AHEAD"><span class="swatch" style="background:var(--c-day-ahead)"></span>ENTSO-E Day-Ahead</span>
+    <span class="src-chip" data-src="INTRADAY"><span class="swatch" style="background:var(--c-intraday)"></span>ENTSO-E Intraday</span>
+    <span class="src-chip" data-src="CURRENT"><span class="swatch" style="background:var(--c-current)"></span>ENTSO-E Current</span>
+    <span class="src-chip active" data-src="ACTUAL"><span class="swatch" style="background:var(--c-actual)"></span>ENTSO-E Actual</span>
+    <span class="src-chip" data-src="MAVIR" id="mavirChip"><span class="swatch" style="background:var(--c-mavir)"></span>MAVIR (HU TSO)</span>
+    <span class="src-chip" data-src="OPEN_METEO"><span class="swatch" style="background:var(--c-meteo)"></span>Open-Meteo (weather)</span>
+  </div>
+  <div class="provenance" style="margin-top:10px;">
+    <div class="prov-grid" id="provGrid"></div>
+  </div>
+</details>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>☀ Solar forecast</h2>
+    <div class="meta" id="solarMeta">Loading…</div>
+    <div class="chart-wrap"><canvas id="solarChart"></canvas></div>
+    <div class="stats" id="solarStats"></div>
+  </div>
+  <div class="card">
+    <h2>💨 Wind forecast</h2>
+    <div class="meta" id="windMeta">Loading…</div>
+    <div class="chart-wrap"><canvas id="windChart"></canvas></div>
+    <div class="stats" id="windStats"></div>
+  </div>
+</div>
+
+<details class="raw-data">
+  <summary>Raw data table — click any column header to open its source</summary>
+  <div style="margin: 8px 0; font-size: 12px; color: var(--text-muted);">
+    Values in <b>MW per 15-min MTU</b>, Budapest local time. Empty cells = source did not publish that timestamp.
+  </div>
+  <div class="raw-table-wrap"><table class="raw" id="rawTable"></table></div>
+</details>
+
+
+</main>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════
+// Per-source URLs for the "click column header to open source" feature
+// ═════════════════════════════════════════════════════════════════════
+const SOURCE_URLS = {
+  // ENTSO-E columns: same Transparency Platform page (it publishes all 4
+  // columns at once — user picks the column in the UI). Deep-link works
+  // only after navigating from main page; that's an ENTSO-E quirk we can't fix.
+  ENTSOE_BASE: 'https://transparency.entsoe.eu/',
+  ENTSOE_DEEP: 'https://transparency.entsoe.eu/generation/r2/dayAheadGenerationForecastWindAndSolar/show?areaType=BZN&biddingZone.values=CTY%7C10YHU-MAVIR----U!BZN%7C10YHU-MAVIR----U',
+  // MAVIR native pages — date picker on the page accepts any day
+  MAVIR_WIND:  'https://www.mavir.hu/web/mavir/szeltermeles-becsles-es-teny-adatok',
+  MAVIR_SOLAR: 'https://www.mavir.hu/web/mavir/naptermeles-becsles-es-teny-adatok',
+  // Open-Meteo — JSON API + interactive docs page that pre-fills HU centroid
+  OPEN_METEO_HU: 'https://open-meteo.com/en/docs?latitude=47.16&longitude=19.50&hourly=shortwave_radiation,wind_speed_100m&timezone=Europe%2FBudapest&forecast_days=2',
+  // Energy-Charts — friendlier mirror of the same ENTSO-E data
+  ENERGY_CHARTS: 'https://www.energy-charts.info/charts/power_forecast/chart.htm?l=en&c=HU',
+};
+
+// ═════════════════════════════════════════════════════════════════════
+// Global error handlers — sync AND async (promises)
+// ═════════════════════════════════════════════════════════════════════
+function showError(label, err) {
+  const msg = err && err.message ? err.message : String(err);
+  const meta = document.getElementById('solarMeta');
+  if (meta) meta.innerHTML = `<span style="color:#f85149">⚠ ${label}: ${msg}</span>`;
+  const wmeta = document.getElementById('windMeta');
+  if (wmeta) wmeta.innerHTML = `<span style="color:#f85149">⚠ ${label}: ${msg}</span>`;
+  console.error('Forecast Hub', label, err);
+}
+window.addEventListener('error', (ev) => showError('JS error',
+  `${ev.message} (${(ev.filename||'').split('/').pop()}:${ev.lineno})`));
+window.addEventListener('unhandledrejection', (ev) => showError('async error', ev.reason));
+
+// ═════════════════════════════════════════════════════════════════════
+// State
+// ═════════════════════════════════════════════════════════════════════
+let pData = null;
+let solarChart = null, windChart = null;
+const ENABLED = new Set(['DAY_AHEAD', 'ACTUAL']);
+
+// Hard-coded fallback colors so the chart renders even if CSS-var lookup
+// returns empty (some browsers strip whitespace differently or apply CSS
+// after first script execution).
+const COLOR = {
+  DAY_AHEAD:  '#58a6ff',
+  INTRADAY:   '#d29922',
+  CURRENT:    '#a371f7',
+  ACTUAL:     '#3fb950',
+  MAVIR:      '#f29a4a',
+  OPEN_METEO: '#ff7b72',
+};
+
+// ═════════════════════════════════════════════════════════════════════
+// Theme
+// ═════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('fh_light', document.body.classList.contains('light') ? '1' : '0');
+  if (solarChart) try { render(); } catch (e) { console.error(e); }
+}
+if (localStorage.getItem('fh_light') === '1') document.body.classList.add('light');
+
+// ═════════════════════════════════════════════════════════════════════
+// Init
+// ═════════════════════════════════════════════════════════════════════
+let SELECTED_COUNTRY = localStorage.getItem('fh_country') || 'HU';
+let COUNTRIES = {};
+
+async function loadCountries() {
+  try {
+    const r = await fetch('/api/forecast_hub/countries');
+    COUNTRIES = await r.json();
+  } catch (e) {
+    COUNTRIES = { HU: { label: 'Hungary', flag: '🇭🇺' } };
+  }
+  const sel = document.getElementById('countryPicker');
+  sel.innerHTML = '';
+  for (const [code, meta] of Object.entries(COUNTRIES)) {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = `${meta.flag || ''} ${meta.label}`.trim();
+    if (code === SELECTED_COUNTRY) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  if (!COUNTRIES[SELECTED_COUNTRY]) {
+    SELECTED_COUNTRY = Object.keys(COUNTRIES)[0] || 'HU';
+    sel.value = SELECTED_COUNTRY;
+  }
+  sel.addEventListener('change', () => {
+    SELECTED_COUNTRY = sel.value;
+    localStorage.setItem('fh_country', SELECTED_COUNTRY);
+    reload();
+  });
+}
+
+async function init() {
+  setDate(0);
+  await loadCountries();
+  // Sanity check: Chart.js loaded?
+  if (typeof Chart === 'undefined') {
+    showError('Chart.js not loaded', new Error('CDN blocked? Check network.'));
+    // Continue anyway — the table doesn't need Chart.js
+  }
+  document.getElementById('datePicker').addEventListener('change', () => {
+    document.querySelectorAll('.quick button').forEach(b => b.classList.remove('active'));
+    reload();
+  });
+  document.querySelectorAll('.quick button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.quick button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setDate(parseInt(btn.dataset.d, 10));
+      reload();
+    });
+  });
+  document.querySelectorAll('.src-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (chip.classList.contains('disabled')) return;
+      const src = chip.dataset.src;
+      if (ENABLED.has(src)) ENABLED.delete(src); else ENABLED.add(src);
+      chip.classList.toggle('active');
+      render();
+    });
+  });
+  reload();
+}
+
+function setDate(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  document.getElementById('datePicker').value = `${yyyy}-${mm}-${dd}`;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Fetch
+// ═════════════════════════════════════════════════════════════════════
+async function reload() {
+  const date = document.getElementById('datePicker').value;
+  const cc = SELECTED_COUNTRY;
+  const cMeta = COUNTRIES[cc] || { label: cc };
+  const flag = cMeta.flag || '';
+  document.getElementById('solarMeta').innerHTML = `<b>${flag} ${cMeta.label}</b> · ${date} · <span style="color:var(--warn)">fetching…</span>`;
+  document.getElementById('windMeta').innerHTML  = `<b>${flag} ${cMeta.label}</b> · ${date} · <span style="color:var(--warn)">fetching…</span>`;
+  const mavirChip = document.getElementById('mavirChip');
+  if (mavirChip) mavirChip.style.display = (cc === 'HU') ? '' : 'none';
+  try {
+    const url = `/api/forecast_hub?country=${cc}&date=${date}&_=${Date.now()}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+    pData = await r.json();
+  } catch (e) {
+    showError('Fetch failed', e);
+    return;
+  }
+  // Update meta the moment data arrives, BEFORE chart render — so even if the
+  // chart explodes the user can see the fetch succeeded.
+  const errFmt = (pData.errors || []).length ? ` <span style="color:var(--danger)">⚠ ${pData.errors.length} backend error</span>` : '';
+  document.getElementById('solarMeta').innerHTML = `<b>${flag} ${cMeta.label}</b> · <b>${pData.date}</b> · ${pData.tz}${errFmt}`;
+  document.getElementById('windMeta').innerHTML  = `<b>${flag} ${cMeta.label}</b> · <b>${pData.date}</b> · ${pData.tz}${errFmt}`;
+  try { render(); }                catch (e) { showError('Chart render', e); }
+  try { renderRawTable(); }        catch (e) { console.error('table', e); }
+  try { updateChipAvailability(); } catch (e) { console.error('chips', e); }
+  try { renderProvenance(); }      catch (e) { console.error('provenance', e); }
+}
+
+function updateChipAvailability() {
+  const s = (pData && pData.summary) || {};
+  const avail = {
+    DAY_AHEAD:  s.entsoe_day_ahead_wind  || s.entsoe_day_ahead_solar,
+    INTRADAY:   s.entsoe_intraday_wind   || s.entsoe_intraday_solar,
+    CURRENT:    s.entsoe_current_wind    || s.entsoe_current_solar,
+    ACTUAL:     s.entsoe_actual_wind     || s.entsoe_actual_solar,
+    MAVIR:      s.mavir_available,
+    OPEN_METEO: s.open_meteo_available,
+  };
+  document.querySelectorAll('.src-chip').forEach(chip => {
+    const src = chip.dataset.src;
+    if (avail[src]) {
+      chip.classList.remove('disabled');
+    } else {
+      chip.classList.add('disabled');
+      chip.classList.remove('active');
+      ENABLED.delete(src);
+    }
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Provenance panel
+// ═════════════════════════════════════════════════════════════════════
+function renderProvenance() {
+  if (!pData) return;
+  const s = pData.summary || {};
+  const items = [];
+  ['DAY_AHEAD', 'INTRADAY', 'CURRENT', 'ACTUAL'].forEach(col => {
+    const has_w = s[`entsoe_${col.toLowerCase()}_wind`];
+    const has_s = s[`entsoe_${col.toLowerCase()}_solar`];
+    items.push(`
+      <div class="prov-item">
+        <div class="src"><span style="width:10px;height:10px;background:${COLOR[col]};border-radius:2px;display:inline-block"></span>ENTSO-E · ${col}</div>
+        <div class="det">
+          ${has_w ? '<span class="ok">✓</span>' : '<span class="miss">—</span>'} wind ·
+          ${has_s ? '<span class="ok">✓</span>' : '<span class="miss">—</span>'} solar
+        </div>
+        <div style="margin-top:4px;"><a href="${SOURCE_URLS.ENTSOE_BASE}" target="_blank">Open ENTSO-E ↗</a></div>
+      </div>`);
+  });
+  if (SELECTED_COUNTRY === 'HU') {
+    const mw = pData.mavir;
+    items.push(`
+      <div class="prov-item">
+        <div class="src"><span style="width:10px;height:10px;background:${COLOR.MAVIR};border-radius:2px;display:inline-block"></span>MAVIR (HU TSO)</div>
+        <div class="det">
+          ${s.mavir_available ? `<span class="ok">✓</span> wind forecast: ${Object.keys((mw && mw.wind_forecast) || {}).length} pts; actual: ${Object.keys((mw && mw.wind_actual) || {}).length} pts`
+                              : '<span class="miss">— not yet published for this date</span>'}
+        </div>
+        <div style="margin-top:4px;"><a href="${SOURCE_URLS.MAVIR_WIND}" target="_blank">Wind ↗</a> · <a href="${SOURCE_URLS.MAVIR_SOLAR}" target="_blank">Solar ↗</a></div>
+      </div>`);
+  }
+  const om = pData.open_meteo;
+  items.push(`
+    <div class="prov-item">
+      <div class="src"><span style="width:10px;height:10px;background:${COLOR.OPEN_METEO};border-radius:2px;display:inline-block"></span>Open-Meteo (weather)</div>
+      <div class="det">
+        ${om ? `<span class="ok">✓</span> ${Object.keys(om.solar||{}).length} solar / ${Object.keys(om.wind||{}).length} wind pts · capacity: ${om.meta.pv_capacity_mw} MW PV / ${om.meta.wind_capacity_mw} MW wind`
+              : '<span class="miss">— not fetched</span>'}
+      </div>
+      <div style="margin-top:4px;"><a href="${SOURCE_URLS.OPEN_METEO_HU}" target="_blank">Open Open-Meteo ↗</a></div>
+    </div>`);
+  document.getElementById('provGrid').innerHTML = items.join('');
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Render charts
+// ═════════════════════════════════════════════════════════════════════
+function timeKeysSorted(...maps) {
+  const set = new Set();
+  for (const m of maps) for (const k of Object.keys(m || {})) set.add(k);
+  return [...set].sort();
+}
+
+function buildDataset(label, dataMap, keys, color, opts = {}) {
+  return {
+    label,
+    data: keys.map(k => dataMap[k] === undefined ? null : dataMap[k]),
+    borderColor: color,
+    backgroundColor: color + '22',
+    borderWidth: opts.thick ? 2.5 : 1.8,
+    borderDash: opts.dashed ? [5, 4] : [],
+    fill: false, tension: 0.25, pointRadius: 0, pointHoverRadius: 3.5, spanGaps: true,
+  };
+}
+
+function gatherSeries(kind) {
+  if (!pData) return [];
+  const out = [];
+  const entsoe = pData.entsoe || {};
+  const sk = entsoe[kind] || {};
+  ['DAY_AHEAD', 'INTRADAY', 'CURRENT', 'ACTUAL'].forEach(function(col) {
+    if (!ENABLED.has(col)) return;
+    const m = sk[col] || {};
+    if (Object.keys(m).length === 0) return;
+    out.push({ label: 'E-E ' + col.replace('_', '-'), data: m, color: COLOR[col],
+               dashed: false, thick: col === 'DAY_AHEAD' || col === 'ACTUAL' });
+  });
+  if (kind === 'wind' && ENABLED.has('MAVIR') && pData.mavir) {
+    const wf = pData.mavir.wind_forecast || {};
+    const wa = pData.mavir.wind_actual || {};
+    if (Object.keys(wf).length) out.push({ label: 'MAVIR forecast', data: wf, color: COLOR.MAVIR, dashed: true });
+    if (Object.keys(wa).length) out.push({ label: 'MAVIR actual',   data: wa, color: COLOR.MAVIR, dashed: false, thick: true });
+  }
+  if (ENABLED.has('OPEN_METEO') && pData.open_meteo) {
+    const m = pData.open_meteo[kind] || {};
+    if (Object.keys(m).length) out.push({ label: 'Open-Meteo', data: m, color: COLOR.OPEN_METEO, dashed: true });
+  }
+  return out;
+}
+
+function chartOpts() {
+  const isLight = document.body.classList.contains('light');
+  const grid = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+  const tick = isLight ? '#57606a' : '#8b949e';
+  return {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { color: tick, font: { size: 11 }, boxWidth: 14, padding: 8 } },
+      tooltip: { callbacks: {
+        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y == null ? '—' : Math.round(ctx.parsed.y).toLocaleString()} MW`,
+      }},
+    },
+    scales: {
+      x: { grid: { color: grid }, ticks: { color: tick, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: { grid: { color: grid }, ticks: { color: tick, callback: v => Math.round(v).toLocaleString() },
+           title: { display: true, text: 'MW', color: tick, font: { size: 11 } } },
+    },
+  };
+}
+
+function render() {
+  if (!pData) return;
+  ['solar', 'wind'].forEach(kind => {
+    const series = gatherSeries(kind);
+    const keys = timeKeysSorted(...series.map(s => s.data));
+    const datasets = series.map(s => buildDataset(s.label, s.data, keys, s.color, { dashed: s.dashed, thick: s.thick }));
+    const canvasId = kind + 'Chart';
+    const chartVar = kind === 'solar' ? 'solarChart' : 'windChart';
+    if (window[chartVar]) window[chartVar].destroy();
+    if (datasets.length === 0) {
+      window[chartVar] = new Chart(document.getElementById(canvasId), {
+        type: 'line', data: { labels: ['—'], datasets: [{ label: 'no source enabled', data: [null] }] },
+        options: chartOpts(),
+      });
+    } else {
+      window[chartVar] = new Chart(document.getElementById(canvasId), {
+        type: 'line', data: { labels: keys, datasets }, options: chartOpts(),
+      });
+    }
+    if (kind === 'solar') solarChart = window[chartVar]; else windChart = window[chartVar];
+  });
+
+  renderStats();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Stats
+// ═════════════════════════════════════════════════════════════════════
+function summary(data) {
+  const vals = Object.values(data || {}).filter(v => typeof v === 'number');
+  if (!vals.length) return null;
+  const sum = vals.reduce((a, b) => a + b, 0);
+  return { avg: sum / vals.length, peak: Math.max(...vals), energy: sum * 0.25 };
+}
+function statHtml(items) {
+  return items.map(i => `<div class="stat ${i.cls || ''}">
+    <div class="label">${i.label}</div>
+    <div class="val">${i.val == null ? '—' : Math.round(i.val).toLocaleString() + ' ' + (i.unit || 'MW')}</div>
+    ${i.sub ? `<div class="sub">${i.sub}</div>` : ''}
+  </div>`).join('');
+}
+function pickPrimarySeries(kind) {
+  if (!pData) return null;
+  const e = (pData.entsoe || {})[kind] || {};
+  if (Object.keys(e.ACTUAL || {}).length)    return { label: 'Actual',    data: e.ACTUAL,    cls: 'actual' };
+  if (Object.keys(e.CURRENT || {}).length)   return { label: 'Current',   data: e.CURRENT,   cls: 'current' };
+  if (Object.keys(e.INTRADAY || {}).length)  return { label: 'Intraday',  data: e.INTRADAY,  cls: 'intraday' };
+  if (Object.keys(e.DAY_AHEAD || {}).length) return { label: 'Day-Ahead', data: e.DAY_AHEAD, cls: 'day-ahead' };
+  if (pData.open_meteo && Object.keys(pData.open_meteo[kind] || {}).length)
+    return { label: 'Open-Meteo', data: pData.open_meteo[kind], cls: 'meteo' };
+  return null;
+}
+function renderStats() {
+  ['solar', 'wind'].forEach(kind => {
+    const series = pickPrimarySeries(kind);
+    if (!series) {
+      document.getElementById(kind + 'Stats').innerHTML = statHtml([{ label: 'avg', val: null }]);
+      return;
+    }
+    const s = summary(series.data);
+    const items = [
+      { label: 'avg',    val: s.avg,    cls: series.cls, sub: series.label },
+      { label: 'peak',   val: s.peak,   cls: series.cls },
+      { label: 'energy', val: s.energy, unit: 'MWh', cls: series.cls },
+    ];
+    document.getElementById(kind + 'Stats').innerHTML = statHtml(items);
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Raw data table — column headers link to source
+// ═════════════════════════════════════════════════════════════════════
+function renderRawTable() {
+  const tbl = document.getElementById('rawTable');
+  if (!tbl) return;
+  if (!pData) {
+    tbl.innerHTML = '<tr><td style="padding:16px;color:var(--text-muted);">No data fetched yet.</td></tr>';
+    return;
+  }
+  const colSpecs = [];
+  const e = pData.entsoe || {};
+  const eSolar = e.solar || {};
+  const eWind  = e.wind || {};
+
+  function addCol(key, hdr, data, color, url, title) {
+    if (!data) return;
+    if (Object.keys(data).length === 0) return;
+    colSpecs.push({ key: key, hdr: hdr, data: data, color: color, url: url, urlTitle: title });
+  }
+
+  // Solar (ENTSO-E)
+  ['DAY_AHEAD', 'INTRADAY', 'CURRENT', 'ACTUAL'].forEach(function(col) {
+    addCol('s_' + col, 'Solar ' + col.replace('_', '-'), eSolar[col],
+           COLOR[col], SOURCE_URLS.ENTSOE_BASE, 'Open ENTSO-E (navigate from main page)');
+  });
+  // Wind (ENTSO-E)
+  ['DAY_AHEAD', 'INTRADAY', 'CURRENT', 'ACTUAL'].forEach(function(col) {
+    addCol('w_' + col, 'Wind ' + col.replace('_', '-'), eWind[col],
+           COLOR[col], SOURCE_URLS.ENTSOE_BASE, 'Open ENTSO-E (navigate from main page)');
+  });
+  // MAVIR
+  if (pData.mavir) {
+    addCol('mavir_wf', 'MAVIR wind fcst', pData.mavir.wind_forecast,
+           COLOR.MAVIR, SOURCE_URLS.MAVIR_WIND, 'Open MAVIR wind page');
+    addCol('mavir_wa', 'MAVIR wind act', pData.mavir.wind_actual,
+           COLOR.MAVIR, SOURCE_URLS.MAVIR_WIND, 'Open MAVIR wind page');
+  }
+  // Open-Meteo
+  if (pData.open_meteo) {
+    addCol('om_s', 'OM solar', pData.open_meteo.solar,
+           COLOR.OPEN_METEO, SOURCE_URLS.OPEN_METEO_HU, 'Open Open-Meteo API');
+    addCol('om_w', 'OM wind',  pData.open_meteo.wind,
+           COLOR.OPEN_METEO, SOURCE_URLS.OPEN_METEO_HU, 'Open Open-Meteo API');
+  }
+
+  if (colSpecs.length === 0) {
+    tbl.innerHTML = '<tr><td style="padding:16px;color:var(--text-muted);">No source returned data for this date.</td></tr>';
+    return;
+  }
+
+  const allKeys = timeKeysSorted.apply(null, colSpecs.map(function(c) { return c.data; }));
+  const keys = allKeys.filter(function(k) { return /:(00|15|30|45)$/.test(k); });
+
+  const headerCells = colSpecs.map(function(c) {
+    return '<th><a href="' + c.url + '" target="_blank" title="' + c.urlTitle + '">'
+         + '<span class="swatch" style="background:' + c.color + '"></span>' + c.hdr + '</a></th>';
+  }).join('');
+  const headers = '<tr><th>Time</th>' + headerCells + '</tr>';
+
+  const rows = keys.map(function(k) {
+    const cells = colSpecs.map(function(c) {
+      const v = c.data[k];
+      if (v == null) return '<td class="null">—</td>';
+      const str = typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 1 }) : v;
+      return '<td>' + str + '</td>';
+    }).join('');
+    return '<tr><td>' + k + '</td>' + cells + '</tr>';
+  }).join('');
+  tbl.innerHTML = headers + rows;
+}
+
+init();
+</script>
+</body>
+</html>
