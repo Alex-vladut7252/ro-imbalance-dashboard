@@ -844,6 +844,15 @@ let liveIntervals = []; // Store interval IDs for live updates
 
 // ── Country state (multi-country support: RO = full, HU = ENTSO-E-only subset) ──
 let selectedCountry = (localStorage.getItem('ep_country') || 'RO').toUpperCase();
+
+// Currency of the imbalance prices, per country. RO: DAMAS publishes in RON
+// (Lei) — never EUR. HU: MAVIR/ENTSO-E values are HUF, converted to EUR
+// server-side at the live ECB rate. Single source of truth so no panel can
+// drift into labelling Lei as EUR.
+const imbCcy = () => (selectedCountry === 'HU' ? 'EUR' : 'RON');
+// DAMAS publishes volumes as MWh per 15-min ISP; x4 (/0.25h) gives MW.
+const ispToMW = v => (v == null || isNaN(v) ? null : v * 4);
+
 const COUNTRY_META = {
     RO: { label: 'Romania', flag: '🇷🇴' },
     HU: { label: 'Hungary', flag: '🇭🇺' },
@@ -1203,12 +1212,16 @@ function renderMoCards(marg, act, imb) {
     ];
     cards.innerHTML = items.map(c => {
         const clearingVal = fmtNum(c.clearing, 2);
-        const mwVal = fmtNum(c.mw);
-        const qVal = c.q != null ? fmtNum(c.q) : null;
+        // Activated volumes and Sum Q come from DAMAS as MWh per 15-min ISP —
+        // x4 so these cards agree with the imbalance table above. Total bid is
+        // ENTSO-E A24, which already publishes MW (unit field says so), so it
+        // is NOT scaled. Q*P is a cost, not a volume.
+        const mwVal = fmtNum(ispToMW(c.mw));
+        const qVal = c.q != null ? fmtNum(ispToMW(c.q)) : null;
         const qCostVal = c.qCost != null ? fmtNum(c.qCost, 0) : null;
         let extra = '';
         if (qVal !== null) extra += `<div>Sum Q: <b>${qVal}</b> MW</div>`;
-        if (qCostVal !== null) extra += `<div>Q*P: <b>${qCostVal}</b></div>`;
+        if (qCostVal !== null) extra += `<div>Q*P: <b>${qCostVal}</b> ${imbCcy()}</div>`;
         if (c.pSched !== undefined) {
             extra += `<div style="font-size:11px;margin-top:4px;color:var(--text-muted);">Sched: <b>${fmtNum(c.pSched)}</b> | Direct: <b>${fmtNum(c.pDirect)}</b></div>`;
         }
@@ -1244,16 +1257,16 @@ function renderMoDetail(imb) {
     const negStyle = !isNaN(negN) && negN < 0 ? 'color:#e74c3c;font-weight:bold;' : 'font-weight:bold;';
     const posStyle = !isNaN(posN) && posN < 0 ? 'color:#e74c3c;font-weight:bold;' : 'font-weight:bold;';
 
-    const detailCcy = isHU_d ? 'EUR' : 'RON';
+    const detailCcy = imbCcy();
     el.innerHTML = `<div style="background:${bg};border-radius:6px;padding:10px 15px;display:flex;flex-wrap:wrap;gap:20px;font-size:13px;">
         <div>Imbal Price (neg): <span style="${negStyle}">${pNeg}</span> <span style="color:var(--text-muted);font-size:11px;">${detailCcy}</span></div>
         <div>Imbal Price (pos): <span style="${posStyle}">${pPos}</span> <span style="color:var(--text-muted);font-size:11px;">${detailCcy}</span></div>
         <div>Type: <b>${typeLabel}</b></div>
-        <div>Sys Imbalance: <span style="${sysColor}font-weight:bold;">${fmtNum(imb.estimatedSystemImbalance)}</span> MW</div>
-        <div>Consumption: <b>${fmtNum(imb.realizedConsumption, 0)}</b> MW</div>
-        <div>FCR: <b>${fmtNum(imb.fcr)}</b> MW</div>
-        <div>Netting Imp: <b>${fmtNum(imb.imbalanceNettingImport)}</b></div>
-        <div>Netting Exp: <b>${fmtNum(imb.imbalanceNettingExport)}</b></div>
+        <div>Sys Imbalance: <span style="${sysColor}font-weight:bold;">${fmtNum(ispToMW(imb.estimatedSystemImbalance))}</span> MW</div>
+        <div>Consumption: <b>${fmtNum(ispToMW(imb.realizedConsumption), 0)}</b> MW</div>
+        <div>FCR: <b>${fmtNum(ispToMW(imb.fcr))}</b> MW</div>
+        <div>Netting Imp: <b>${fmtNum(ispToMW(imb.imbalanceNettingImport))}</b> MW</div>
+        <div>Netting Exp: <b>${fmtNum(ispToMW(imb.imbalanceNettingExport))}</b> MW</div>
     </div>`;
 }
 
@@ -1301,8 +1314,10 @@ function renderMoTables(selKey) {
                 bg = selBgUp;
                 rowStyle = 'font-weight:bold;';
             }
-            const upMW = act[upKey];
-            const dnMW = act[dnKey];
+            // DAMAS activated volumes are MWh per 15-min ISP; x4 so the "MW"
+            // columns here match the imbalance table above for the same interval.
+            const upMW = ispToMW(act[upKey]);
+            const dnMW = ispToMW(act[dnKey]);
 
             html += `<tr data-key="${k}" ${isSel ? 'data-selected="1"' : ''} style="background:${bg};${rowStyle}cursor:pointer;" onclick="document.getElementById('moInterval').value='${k}';renderMeritOrder();">`;
             html += `<td style="padding:3px 4px;border-bottom:1px solid ${borderC};font-size:11px;">${k}</td>`;
@@ -1410,7 +1425,7 @@ function renderImbalanceTable() {
     // HU prices come from ENTSO-E in HUF; the column shows the EUR-converted
     // value (live ECB rate). RO prices come from DAMAS already in RON which
     // we display as-is. Single price column per direction; no state pill.
-    const priceCcy = selectedCountry === 'HU' ? 'EUR' : 'RON';
+    const priceCcy = imbCcy();
     const isHU = selectedCountry === 'HU';
     const allCols = [
         { key: 'time', label: 'Time', align: 'left' },
@@ -2450,28 +2465,34 @@ function renderMarketStatus(sug) {
 
     const c = sug.current;
     const price = c.neg_price;
-    const imb = c.system_imbalance;
+    // Server sends the raw DAMAS estimatedSystemImbalance (MWh per 15-min ISP).
+    // Convert once here so the label can honestly say MW; thresholds below are
+    // scaled by the same x4 (100 MWh/ISP = 400 MW) to keep the colours unchanged.
+    const imbMW = ispToMW(c.system_imbalance);
+    const consMW = ispToMW(c.realized_consumption);
+    const ccy = imbCcy();
     const isNeg = price != null && price < 0;
-    const isSurplus = imb != null && imb > 0;
+    const isSurplus = imbMW != null && imbMW > 0;
+    const p = price != null ? price.toFixed(2) : '?';
 
     // Colour + one-line status by actual price / imbalance — data only, no advice.
     let statusText, statusColor, statusBg;
     if (isNeg) {
         statusColor = '#e74c3c';
         statusBg = 'rgba(231,76,60,0.1)';
-        statusText = `Prices are NEGATIVE (${price.toFixed(2)} EUR)`;
-    } else if (isSurplus && imb > 100) {
+        statusText = `Prices are NEGATIVE (${p} ${ccy}/MWh)`;
+    } else if (isSurplus && imbMW > 400) {
         statusColor = '#e67e22';
         statusBg = 'rgba(230,126,34,0.08)';
-        statusText = `Prices positive (${price != null ? price.toFixed(2) : '?'} EUR) but system has surplus`;
-    } else if (isSurplus && imb > 0) {
+        statusText = `Prices positive (${p} ${ccy}/MWh) but system has surplus`;
+    } else if (isSurplus) {
         statusColor = '#f39c12';
         statusBg = 'rgba(243,156,18,0.06)';
-        statusText = `Prices positive (${price != null ? price.toFixed(2) : '?'} EUR), small surplus`;
+        statusText = `Prices positive (${p} ${ccy}/MWh), small surplus`;
     } else {
         statusColor = '#27ae60';
         statusBg = 'rgba(39,174,96,0.08)';
-        statusText = `Prices positive (${price != null ? price.toFixed(2) : '?'} EUR)`;
+        statusText = `Prices positive (${p} ${ccy}/MWh)`;
     }
 
     let html = `<div style="padding:12px 16px;border-radius:8px;background:${statusBg};border:2px solid ${statusColor};">
@@ -2480,10 +2501,10 @@ function renderMarketStatus(sug) {
 
     // Live numbers
     html += `<div style="display:flex;gap:20px;margin-top:10px;font-size:13px;">
-        <span>Imbalance Price: <b style="color:${isNeg ? '#e74c3c' : '#27ae60'};">${price != null ? price.toFixed(2) + ' EUR' : '-'}</b></span>
-        <span>System Imbalance: <b style="color:${isSurplus ? '#e74c3c' : '#27ae60'};">${imb != null ? (imb > 0 ? '+' : '') + imb.toFixed(0) + ' MW' : '-'}</b>
-            ${imb != null ? `<span style="font-size:11px;color:var(--text-muted);"> (${imb > 0 ? 'too much production' : 'not enough production'})</span>` : ''}</span>
-        <span>Consumption: <b>${c.realized_consumption != null ? c.realized_consumption.toFixed(0) + ' MW' : '-'}</b></span>
+        <span>Imbalance Price: <b style="color:${isNeg ? '#e74c3c' : '#27ae60'};">${price != null ? price.toFixed(2) + ' ' + ccy + '/MWh' : '-'}</b></span>
+        <span>System Imbalance: <b style="color:${isSurplus ? '#e74c3c' : '#27ae60'};">${imbMW != null ? (imbMW > 0 ? '+' : '') + imbMW.toFixed(0) + ' MW' : '-'}</b>
+            ${imbMW != null ? `<span style="font-size:11px;color:var(--text-muted);"> (${imbMW > 0 ? 'too much production' : 'not enough production'})</span>` : ''}</span>
+        <span>Consumption: <b>${consMW != null ? consMW.toFixed(0) + ' MW' : '-'}</b></span>
     </div>`;
 
     container.innerHTML = html;
@@ -2571,7 +2592,7 @@ function renderPrediction(pred) {
     // Current price — show with DAMAS lag note if stale
     const cp = pred.current_price;
     if (cp != null) {
-        let priceText = cp.toFixed(2) + ' EUR/MWh';
+        let priceText = cp.toFixed(2) + ' ' + imbCcy() + '/MWh';
         if (lagISPs >= 2) priceText += ` (${lagISPs * 15}min ago)`;
         priceEl.textContent = priceText;
         priceEl.style.color = cp < 0 ? '#e74c3c' : '#27ae60';
@@ -2717,7 +2738,7 @@ function renderPrediction(pred) {
                     let body = alertQs.map(q => `${q.target_time}: ${Math.round(q.probability*100)}% negative`).join('\n');
                     if (lrNegPct >= 50) body += `\nGrid model: ${lrNegPct}% negative`;
                     new Notification('NEGATIVE PRICE WARNING', {
-                        body: body + `\nCurrent: ${cp != null ? cp.toFixed(2) : '?'} EUR/MWh`,
+                        body: body + `\nCurrent: ${cp != null ? cp.toFixed(2) : '?'} ${imbCcy()}/MWh`,
                         requireInteraction: true, tag: 'neg-price-alert'
                     });
                 } catch(e) {}
