@@ -32,6 +32,7 @@ prices are shown only for the direction actually activated.
 |---|---|---|
 | `ENTSOE_API_KEY` | no | ENTSO-E generation chart + ML prediction card. Get your own free token from the ENTSO-E Transparency Platform — **none is shipped in this repo**. |
 | `PORT` | no | HTTP port (default `8084`; the Dockerfile uses `7860`). |
+| `APP_USER` / `APP_PASSWORD` | no | Set both to put the whole app behind HTTP basic auth — pages and `/api/*` alike. Leave unset for local development. **Set them before exposing this app to the internet**: there is no user model and every endpoint serves the same data to anyone who can reach it. |
 
 The core imbalance tables use DAMAS only and need no key or account.
 

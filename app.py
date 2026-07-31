@@ -6,13 +6,14 @@ Replicates daciaenergy.ro/prediction with live ENTSO-E + Transelectrica data.
 import os
 import sys
 import json
+import hmac
 import logging
 import warnings
 from datetime import datetime, timedelta
 from threading import Thread
 import time
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 
 from entsoe_client import EntsoeClient
 from transelectrica_client import TranselectricaTracker
@@ -36,6 +37,40 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# ── HTTP Basic auth ───────────────────────────────────────────────────────────
+# The app has no user model and every route — pages and /api/* alike — exposes
+# the same data, so a single shared credential checked before the request is
+# enough. Set APP_USER and APP_PASSWORD to switch it on; leave them unset for
+# local development. Kept in the app rather than in the reverse proxy so the
+# protection travels with the code to whatever host it lands on.
+APP_USER = os.environ.get('APP_USER', '')
+APP_PASSWORD = os.environ.get('APP_PASSWORD', '')
+AUTH_ENABLED = bool(APP_USER and APP_PASSWORD)
+
+if AUTH_ENABLED:
+    log.info("HTTP basic auth ENABLED for user '%s'", APP_USER)
+else:
+    log.warning("HTTP basic auth DISABLED — set APP_USER and APP_PASSWORD "
+                "before exposing this app to the internet")
+
+
+@app.before_request
+def _require_basic_auth():
+    if not AUTH_ENABLED:
+        return None
+    auth = request.authorization
+    # compare_digest on both fields so a wrong username costs the same time as
+    # a wrong password, and an absent header does not short-circuit early.
+    if (auth and auth.type == 'basic'
+            and hmac.compare_digest(auth.username or '', APP_USER)
+            and hmac.compare_digest(auth.password or '', APP_PASSWORD)):
+        return None
+    return Response(
+        'Authentication required.', 401,
+        {'WWW-Authenticate': 'Basic realm="Platforma dezechilibre"'}
+    )
+
 
 # Initialize database
 db.init_db()
