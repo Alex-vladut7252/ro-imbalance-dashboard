@@ -10,7 +10,10 @@ from datetime import datetime
 
 log = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'energy_data.db')
+# Default: next to the code, which is what a local checkout wants. On a server
+# the code lives in a container that gets replaced on every redeploy, so point
+# DB_PATH at a mounted volume instead or the 1-year archive is lost each time.
+DB_PATH = os.environ.get('DB_PATH') or os.path.join(os.path.dirname(__file__), 'energy_data.db')
 
 
 def get_db():

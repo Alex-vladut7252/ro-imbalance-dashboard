@@ -32,6 +32,7 @@ prices are shown only for the direction actually activated.
 |---|---|---|
 | `ENTSOE_API_KEY` | no | ENTSO-E generation chart + ML prediction card. Get your own free token from the ENTSO-E Transparency Platform — **none is shipped in this repo**. |
 | `PORT` | no | HTTP port (default `8084`; the Dockerfile uses `7860`). |
+| `DB_PATH` | no | Where the SQLite archive lives (default: next to the code; `/data/energy_data.db` in the image). Point it at a mounted volume on a server. |
 
 The core imbalance tables use DAMAS only and need no key or account.
 
@@ -45,14 +46,43 @@ python app.py            # http://localhost:8084
 ## Deploy
 
 ```bash
-docker build -t ro-imbalance .
-docker run -p 7860:7860 -e ENTSOE_API_KEY=<your-token> ro-imbalance
+echo "ENTSOE_API_KEY=<your-token>" > .env    # optional
+docker compose up -d --build
 ```
 
-Any Docker host works (Hugging Face Spaces, Fly.io, Railway, a VPS behind
-nginx). Needs ~1 GB RAM — the ML stack (PyTorch + XGBoost + Prophet) does not
-fit in a 512 MB tier. To run without ML, drop `torch` from the image; the DAMAS
-tables and the archive are independent of it.
+Serves on port 80, restarts on crash and on reboot, and keeps the archive in a
+named volume so a rebuild does not wipe it.
+
+The image builds on **x86_64 and arm64** — the Dockerfile picks the right torch
+wheel per architecture (PyTorch's CPU index on x86 to avoid the CUDA
+dependencies; plain PyPI on ARM, where the wheel is already CPU-only).
+
+Measured footprint with all models loaded: **~830 MB RSS**. A 512 MB tier will
+not hold it. To run without ML, drop `torch` from the image — the DAMAS tables
+and the archive do not depend on it.
+
+### Oracle Cloud Ampere A1 (free)
+
+The Always Free ARM shape (2 OCPU / 12 GB as of June 2026) fits this
+comfortably. Two things bite on OCI specifically:
+
+1. **Two firewalls.** Opening the port in the VCN Security List is not enough —
+   the instance also ships local iptables rules that drop everything but SSH:
+   ```bash
+   sudo iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
+   sudo netfilter-persistent save        # Ubuntu
+   ```
+2. **Capacity.** ARM shapes are often "Out of Capacity" in a given region, and
+   the home region is chosen once and cannot be changed later.
+
+Backfill the archive once the container is up:
+
+```bash
+docker compose exec dashboard python archive_backfill.py 366
+```
+
+For a domain with HTTPS, put Caddy or nginx in front — the app speaks plain
+HTTP and does not terminate TLS itself.
 
 ## Archive data
 

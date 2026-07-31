@@ -1,0 +1,24 @@
+# Deploy on a plain Docker host (Oracle Cloud Ampere A1, a VPS, anything).
+#   docker compose up -d --build
+services:
+  dashboard:
+    build: .
+    image: ro-imbalance
+    container_name: ro-imbalance
+    # Survives both a crash and a VM reboot.
+    restart: unless-stopped
+    ports:
+      - "80:7860"
+    environment:
+      # Optional — only the generation chart and the prediction card need it.
+      # Read from the host env or a .env file next to this file; never commit it.
+      ENTSOE_API_KEY: ${ENTSOE_API_KEY:-}
+      DB_PATH: /data/energy_data.db
+      TZ: Europe/Bucharest
+    volumes:
+      # The 1-year DAMAS archive. Without this the DB dies with the container
+      # on every rebuild and has to be backfilled again.
+      - archive:/data
+
+volumes:
+  archive:
