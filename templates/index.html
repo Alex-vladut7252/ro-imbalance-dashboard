@@ -638,6 +638,7 @@
                     Today
                 </button>
                 <span id="modeIndicator"></span>
+                <button onclick="toggleAutoRefresh()" id="autoRefreshBtn"></button>
                 <span id="apiStatus"></span>
             </div>
             <div class="header-right">
@@ -709,7 +710,7 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                         <label style="font-size:13px;font-weight:bold;">Interval:</label>
-                        <select id="moInterval" onchange="renderMeritOrder()" style="min-width:150px;"></select>
+                        <select id="moInterval" onchange="renderMeritOrder(true)" style="min-width:150px;"></select>
                         <button onclick="moAutoSelect()" style="background:#6c757d;padding:6px 12px;font-size:12px;" title="Jump to current interval">Now</button>
                     </div>
                 </div>
@@ -842,6 +843,91 @@ let isLiveMode = true;
 let selectedDate = new Date().toISOString().split('T')[0];
 let liveIntervals = []; // Store interval IDs for live updates
 
+// Auto-refresh stays on unless the user paused it on an earlier visit.
+let autoRefreshEnabled = localStorage.getItem('ep_auto_refresh') !== '0';
+
+// ═══════════════════════════════════════════════════════════════
+//  IDLE-RENDER GUARD
+// ═══════════════════════════════════════════════════════════════
+// The live pollers run every 15-30s, but the balancing data behind them only
+// moves once per 15-minute ISP. Redrawing regardless meant ~59 of every 60
+// cycles rebuilt identical markup. Each render step now declares a signature;
+// when it matches the previous one the redraw is skipped entirely, so the page
+// sits still until the numbers actually change.
+const renderSigs = {};
+function dataChanged(key, payload) {
+    const sig = JSON.stringify(payload);
+    if (renderSigs[key] === sig) return false;
+    renderSigs[key] = sig;
+    return true;
+}
+
+// Set when the user changes the context (date, country, resume) or on first
+// paint: the next render must repaint even if the payload matches, and it is
+// allowed to scroll the current interval into view.
+let pendingCenter = true;
+function forceNextRender() {
+    for (const k of Object.keys(renderSigs)) delete renderSigs[k];
+    pendingCenter = true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  IN-PLACE DOM PATCHING
+// ═══════════════════════════════════════════════════════════════
+// Assigning innerHTML destroys every node in the container and builds new
+// ones. The browser then has nothing left to anchor on: the container's own
+// scrollTop snaps back to 0, text the user had selected vanishes mid-drag, and
+// the page visibly lurches. morph() walks the old and the new tree side by
+// side and touches only what genuinely differs, so a changed number updates in
+// place while the rows around it — and the scroll position — stay put.
+function morph(target, html) {
+    if (!target) return;
+    // Parse against a stand-in of the same tag. innerHTML takes its parsing
+    // rules from the context element, so a <tr> string parsed inside a <div>
+    // silently loses its tags — which would blank the tbody this is called on.
+    const proto = target.cloneNode(false);
+    proto.innerHTML = html;
+    morphChildren(target, proto);
+}
+
+function morphChildren(oldParent, newParent) {
+    const oldNodes = Array.from(oldParent.childNodes);
+    const newNodes = Array.from(newParent.childNodes);
+    const shared = Math.min(oldNodes.length, newNodes.length);
+    for (let i = 0; i < shared; i++) morphNode(oldNodes[i], newNodes[i]);
+    for (let i = oldNodes.length - 1; i >= shared; i--) oldNodes[i].remove();
+    for (let i = shared; i < newNodes.length; i++) oldParent.appendChild(newNodes[i]);
+}
+
+function morphNode(oldNode, newNode) {
+    if (oldNode.nodeType !== newNode.nodeType || oldNode.nodeName !== newNode.nodeName) {
+        oldNode.replaceWith(newNode);
+        return;
+    }
+    if (oldNode.nodeType === Node.TEXT_NODE || oldNode.nodeType === Node.COMMENT_NODE) {
+        if (oldNode.nodeValue !== newNode.nodeValue) oldNode.nodeValue = newNode.nodeValue;
+        return;
+    }
+    if (oldNode.nodeType !== Node.ELEMENT_NODE) return;
+    for (const attr of Array.from(newNode.attributes)) {
+        if (oldNode.getAttribute(attr.name) !== attr.value) oldNode.setAttribute(attr.name, attr.value);
+    }
+    for (const attr of Array.from(oldNode.attributes)) {
+        if (!newNode.hasAttribute(attr.name)) oldNode.removeAttribute(attr.name);
+    }
+    morphChildren(oldNode, newNode);
+}
+
+// Belt and braces. Even an in-place patch can change a container's height (a
+// row appears), which slides everything below it and takes the viewport along.
+// Pin the window offset across the update so a background refresh can never
+// move the user up or down the page.
+function keepPageScroll(fn) {
+    const x = window.scrollX, y = window.scrollY;
+    fn();
+    if (window.scrollX !== x || window.scrollY !== y) window.scrollTo(x, y);
+}
+
 // ── Country state (multi-country support: RO = full, HU = ENTSO-E-only subset) ──
 let selectedCountry = (localStorage.getItem('ep_country') || 'RO').toUpperCase();
 
@@ -958,6 +1044,7 @@ function changeCountry() {
     if (!sel) return;
     selectedCountry = sel.value;
     localStorage.setItem('ep_country', selectedCountry);
+    forceNextRender();
     applyCountryVisibility();
     try { stopLiveUpdates(); } catch(e) {}
     // Merit Order now works for HU too (via MAVIR).
@@ -1085,6 +1172,11 @@ async function loadMeritOrderData() {
         const imbData = await responses[2].json();
         const entsoeBal = (responses[3] && responses[3].json) ? await responses[3].json() : { prices: {}, currency: null };
         const entsoeBids = responses[4] ? await responses[4].json() : { bids: {} };
+        // Cards, both merit-order tables and the imbalance table are all built
+        // from these payloads. Identical payloads produce identical markup, so
+        // bail out before touching any of it.
+        if (!dataChanged('meritOrder',
+                [selectedCountry, selectedDate, margData, actData, imbData, entsoeBal, entsoeBids])) return;
         moEntsoePrices = entsoeBal.prices || {};
         moEntsoeCurrency = entsoeBal.currency || null;
         moEntsoeBidsTotal = entsoeBids.bids || {};
@@ -1112,7 +1204,7 @@ async function loadMeritOrderData() {
         // Populate interval dropdown
         const sel = document.getElementById('moInterval');
         const prevVal = sel.value;
-        sel.innerHTML = moIntervalKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+        morph(sel, moIntervalKeys.map(k => `<option value="${k}">${k}</option>`).join(''));
         if (prevVal && moIntervalKeys.includes(prevVal)) sel.value = prevVal;
         else moAutoSelect();
 
@@ -1135,8 +1227,11 @@ async function loadMeritOrderData() {
             return;
         }
 
-        renderMeritOrder();
-        renderImbalanceTable();
+        // Only a context change the user asked for may scroll a table; a
+        // background poll must leave the viewport exactly where it is.
+        const center = pendingCenter;
+        pendingCenter = false;
+        keepPageScroll(() => { renderMeritOrder(center); renderImbalanceTable(center); });
     } catch(e) { console.error('Merit order error:', e); }
 }
 
@@ -1150,10 +1245,10 @@ function moAutoSelect() {
     const match = moIntervalKeys.find(k => k.startsWith(prefix));
     if (match) sel.value = match;
     else sel.value = moIntervalKeys[moIntervalKeys.length - 1];
-    renderMeritOrder();
+    renderMeritOrder(true);
 }
 
-function renderMeritOrder() {
+function renderMeritOrder(center = false) {
     const selKey = document.getElementById('moInterval').value;
     if (!selKey) return;
     const marg = moMarginal[selKey] || {};
@@ -1162,7 +1257,7 @@ function renderMeritOrder() {
 
     renderMoCards(marg, act, imb);
     renderMoDetail(imb);
-    renderMoTables(selKey);
+    renderMoTables(selKey, center);
 }
 
 function moMfrrPrice(marg, dir) {
@@ -1270,7 +1365,7 @@ function renderMoDetail(imb) {
     </div>`;
 }
 
-function renderMoTables(selKey) {
+function renderMoTables(selKey, center = false) {
     const isDark = document.body.classList.contains('dark-mode');
     const hdrBg = isDark ? 'var(--table-header-bg)' : '#f8f9fa';
     const altBg = isDark ? 'var(--table-alt-bg)' : '#f8f9fa';
@@ -1319,7 +1414,7 @@ function renderMoTables(selKey) {
             const upMW = ispToMW(act[upKey]);
             const dnMW = ispToMW(act[dnKey]);
 
-            html += `<tr data-key="${k}" ${isSel ? 'data-selected="1"' : ''} style="background:${bg};${rowStyle}cursor:pointer;" onclick="document.getElementById('moInterval').value='${k}';renderMeritOrder();">`;
+            html += `<tr data-key="${k}" ${isSel ? 'data-selected="1"' : ''} style="background:${bg};${rowStyle}cursor:pointer;" onclick="document.getElementById('moInterval').value='${k}';renderMeritOrder(true);">`;
             html += `<td style="padding:3px 4px;border-bottom:1px solid ${borderC};font-size:11px;">${k}</td>`;
 
             const cellBase = `padding:3px 4px;text-align:right;border-bottom:1px solid ${borderC};`;
@@ -1371,14 +1466,18 @@ function renderMoTables(selKey) {
         return html;
     }
 
-    document.getElementById('moTableAfrr').innerHTML = buildTable('aFRR');
-    document.getElementById('moTableMfrr').innerHTML = buildTable('mFRR');
+    morph(document.getElementById('moTableAfrr'), buildTable('aFRR'));
+    morph(document.getElementById('moTableMfrr'), buildTable('mFRR'));
 
     // Auto-scroll selected row into view — inside its own table container only,
     // never the page. scrollIntoView() bubbles up to the window, so on every
     // 15s live refresh it yanked the whole page to re-center this row (the
     // "refresh jumps to the middle of the page" annoyance). Adjusting the
     // container's own scrollTop keeps the row centered without moving the page.
+    // ...and only when the user actually asked for a new interval. Doing this
+    // on every 15s poll re-centred the table under the user's cursor, undoing
+    // any scrolling they had done since.
+    if (!center) return;
     ['moTableAfrr', 'moTableMfrr'].forEach(id => {
         const container = document.getElementById(id);
         const sel = container.querySelector('tr[data-selected]');
@@ -1406,7 +1505,7 @@ function imbDateLabel(utcStr) {
     return { day, mon, time };
 }
 
-function renderImbalanceTable() {
+function renderImbalanceTable(center = false) {
     const container = document.getElementById('imbalanceTableContainer');
     const tsEl = document.getElementById('imbTimestamp');
     const ouEl = document.getElementById('imbOverUnder');
@@ -1573,7 +1672,7 @@ function renderImbalanceTable() {
     let ouParts = [];
     if (overAvg !== null) ouParts.push(`<span style="color:#27ae60;">Over ${overAvg >= 0 ? '+' : ''}${overAvg.toFixed(2)}</span>`);
     if (underAvg !== null) ouParts.push(`<span style="color:#e74c3c;">Under ${underAvg >= 0 ? '+' : ''}${underAvg.toFixed(2)}</span>`);
-    ouEl.innerHTML = ouParts.length ? ouParts.join(' / ') : '';
+    morph(ouEl, ouParts.length ? ouParts.join(' / ') : '');
 
     // Show "Published up to HH:MM" — the highest-MTU timestamp we received.
     // For HU this is the actual ENTSO-E publication frontier (typically
@@ -1644,12 +1743,14 @@ function renderImbalanceTable() {
     });
 
     html += `</tbody></table>`;
-    container.innerHTML = tableRows.length
+    morph(container, tableRows.length
         ? html
-        : '<div style="padding:48px 20px;text-align:center;color:var(--text-muted);font-size:13px;">No imbalance data published for this date yet.</div>';
+        : '<div style="padding:48px 20px;text-align:center;color:var(--text-muted);font-size:13px;">No imbalance data published for this date yet.</div>');
 
-    // Auto-scroll table container to current quarter (without moving the page)
-    if (currentRowId) {
+    // Auto-scroll table container to current quarter — only on an explicit
+    // context change. On a background poll this fired 100ms after the redraw,
+    // which is what yanked the table out from under the user every 15s.
+    if (center && currentRowId) {
         setTimeout(() => {
             const el = document.getElementById(currentRowId);
             if (el && container) {
@@ -1747,7 +1848,8 @@ async function loadTranselectricaData() {
             buildSenChart();
             if (isLiveMode) {
                 const ph = document.getElementById('entsoeRowsPlaceholder');
-                if (ph) ph.innerHTML = formatEntsoeRows();
+                const rowsHtml = formatEntsoeRows();
+                if (dataChanged('entsoeRows', rowsHtml)) keepPageScroll(() => morph(ph, rowsHtml));
             }
         }).catch(e => console.error('ENTSO-E background load error:', e));
 
@@ -1801,7 +1903,10 @@ async function loadTranselectricaData() {
             html += formatRow(row, false).replace('background-color: #fff', `background-color:${i%2===0?'#fff':'#f8f9fa'}`);
         });
         html += '</table></div>';
-        content.innerHTML = html;
+        // Comparing the rendered markup is exact: identical markup means there
+        // is nothing to do, and when it does differ morph() patches only the
+        // cells that moved instead of rebuilding the whole table.
+        if (dataChanged('transelectricaTable', html)) keepPageScroll(() => morph(content, html));
         updateLiveRow();
 
     } catch(e) { console.error('Transelectrica error:', e); }
@@ -1812,6 +1917,7 @@ async function updateLiveRow() {
         const r = await fetch(`${SCRIPT_ROOT}/transelectrica_live`);
         const data = await r.json();
         if (data.error || !data.live) return;
+        if (!dataChanged('liveRow', data.live)) return;
         const lr = document.getElementById('transelectricaLiveRow');
         const ts = document.getElementById('transelectricaTimestamp');
         if (lr) { const nr = formatRow(data.live, true); lr.outerHTML = nr.replace('<tr ', '<tr id="transelectricaLiveRow" '); }
@@ -2346,6 +2452,7 @@ function updateModeIndicator() {
 
 function startLiveUpdates() {
     stopLiveUpdates();
+    if (!autoRefreshEnabled) return;
     // Stagger start offsets so updates don't pile onto the same animation frame
     const stagger = (fn, interval, offset) => {
         const to = setTimeout(() => {
@@ -2367,12 +2474,35 @@ function stopLiveUpdates() {
     liveIntervals = [];
 }
 
+function updateAutoRefreshBtn() {
+    const b = document.getElementById('autoRefreshBtn');
+    if (!b) return;
+    b.textContent = autoRefreshEnabled ? 'Pause' : 'Resume';
+    b.style.background = autoRefreshEnabled ? '' : '#e67e22';
+    b.title = autoRefreshEnabled
+        ? 'Live updates are on. Pause to stop all background polling.'
+        : 'Live updates are paused. Resume to poll again.';
+}
+
+function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    localStorage.setItem('ep_auto_refresh', autoRefreshEnabled ? '1' : '0');
+    updateAutoRefreshBtn();
+    if (autoRefreshEnabled && isLiveMode && selectedCountry === 'RO') {
+        forceNextRender();   // repaint once with whatever landed while paused
+        startLiveUpdates();
+    } else {
+        stopLiveUpdates();
+    }
+}
+
 async function loadHistoricalDate() {
     const date = document.getElementById('globalDate').value;
     if (!date) return;
     selectedDate = date;
     const today = new Date().toISOString().split('T')[0];
     isLiveMode = (date === today);
+    forceNextRender();
     updateModeIndicator();
     applyCountryVisibility();  // hide live-only suggestion cards on historical dates
 
@@ -2426,6 +2556,7 @@ function goToToday() {
     document.getElementById('globalDate').value = today;
     selectedDate = today;
     isLiveMode = true;
+    forceNextRender();
     updateModeIndicator();
     applyCountryVisibility();  // re-show suggestion cards when back on today
 
@@ -2446,7 +2577,8 @@ async function loadMarketAnalysis() {
     try {
         const resp = await fetch(`${SCRIPT_ROOT}/api/market_suggestion`);
         const sug = await resp.json();
-        renderMarketStatus(sug);
+        if (!dataChanged('marketStatus', sug)) return;
+        keepPageScroll(() => renderMarketStatus(sug));
     } catch(e) { console.error('Market status error:', e); }
 }
 
@@ -2507,7 +2639,7 @@ function renderMarketStatus(sug) {
         <span>Consumption: <b>${consMW != null ? consMW.toFixed(0) + ' MW' : '-'}</b></span>
     </div>`;
 
-    container.innerHTML = html;
+    morph(container, html);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2546,7 +2678,8 @@ async function loadPrediction() {
         const resp = await fetch(`${SCRIPT_ROOT}/api/prediction`);
         const pred = await resp.json();
         latestPredData = pred;
-        renderPrediction(pred);
+        if (!dataChanged('prediction', pred)) return;
+        keepPageScroll(() => renderPrediction(pred));
     } catch(e) { console.error('Prediction fetch error:', e); }
 }
 
@@ -2684,7 +2817,7 @@ function renderPrediction(pred) {
         </div>`;
     });
 
-    tableEl.innerHTML = html;
+    morph(tableEl, html);
 
     // ── Alert banner ──
     // Use ensemble probability for alerts (combines all available models)
@@ -2756,6 +2889,7 @@ document.getElementById('damDate').value = todayStr;
 selectedDate = todayStr;
 isLiveMode = true;
 updateModeIndicator();
+updateAutoRefreshBtn();
 
 // Restore the last-selected country and set up panel visibility accordingly.
 const countrySel = document.getElementById('countrySel');
